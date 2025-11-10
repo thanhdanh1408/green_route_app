@@ -7,3 +7,5 @@ Chưa hoàn thiện: Nhận OTP ở trang quên mật khẩu; chưa làm dữ li
 
 --- Up 2: Hoàn thiện liên kết ngân hàng
 Chưa hoàn thiện: Chưa làm dữ liệu giả (Service)
+
+--- Up 3: Sửa lại cấu trúc project cho gọn, thêm Service (dữ liệu giả) để test chức năng.

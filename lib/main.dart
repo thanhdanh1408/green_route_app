@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'features/auth/screens/register_screen_1.dart';
+import 'features/auth/screens/register_screen_2.dart';
+import 'features/auth/screens/register_screen_3.dart';
+import 'features/auth/screens/forgot_password_screen_1.dart';
+import 'features/auth/screens/forgot_password_screen_2.dart';
+import 'features/auth/screens/bank_link/bank_link_screen.dart';
+import 'features/auth/screens/bank_link/bank_complete_screen.dart';
 import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen_1.dart';
-import 'screens/register_screen_2.dart';
-import 'screens/register_screen_3.dart';
-import 'screens/forgot_password_screen_1.dart';
-import 'screens/forgot_password_screen_2.dart';
-import 'screens/bank_link_screen.dart';
-import 'screens/bank_complete_screen.dart';
+import 'core/theme/app_theme.dart';
 
 void main() {
-  runApp(const GreenRouteApp());
+  runApp(const ProviderScope(child: GreenRouteApp()));
 }
 
 class GreenRouteApp extends StatelessWidget {
@@ -21,9 +23,7 @@ class GreenRouteApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Green Route',
-      theme: ThemeData(
-        fontFamily: 'Roboto',
-      ),
+      theme: AppTheme.lightTheme(),
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
