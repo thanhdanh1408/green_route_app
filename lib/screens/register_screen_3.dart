@@ -20,9 +20,12 @@ class RegisterScreen3 extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: Colors.green,
               ),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.pushNamed(context, '/bank_link');
+              },
               child: const Text('Lưu'),
             ),
+            
           ],
         ),
       ),
