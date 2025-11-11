@@ -6,10 +6,15 @@ import 'features/auth/screens/register_screen_2.dart';
 import 'features/auth/screens/register_screen_3.dart';
 import 'features/auth/screens/forgot_password_screen_1.dart';
 import 'features/auth/screens/forgot_password_screen_2.dart';
+import 'features/auth/screens/forgot_password_screen_3.dart';
 import 'features/auth/screens/bank_link/bank_link_screen.dart';
 import 'features/auth/screens/bank_link/bank_complete_screen.dart';
 import 'screens/splash_screen.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/screens/role_selection_screen.dart';
+import 'features/auth/screens/register_shipper_screen.dart';
+import 'features/auth/screens/register_driver_screen.dart';
+import 'features/auth/screens/register_complete_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: GreenRouteApp()));
@@ -32,8 +37,13 @@ class GreenRouteApp extends StatelessWidget {
         '/register3': (context) => const RegisterScreen3(),
         '/forgot1': (context) => ForgotPasswordScreen1(),
         '/forgot2': (context) => ForgotPasswordScreen2(),
+        '/forgot3': (context) => const ForgotPasswordScreen3(),
         '/bank_link': (context) => const BankLinkScreen(),
         '/bank_complete': (context) => const BankCompleteScreen(),
+        '/role_selection': (context) => const RoleSelectionScreen(),
+        '/register_shipper': (context) => const RegisterShipperScreen(),
+        '/register_driver': (context) => const RegisterDriverScreen(),
+        '/register_complete': (context) => const RegisterCompleteScreen(),
       },
     );
   }

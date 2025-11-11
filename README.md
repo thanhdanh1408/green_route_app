@@ -9,3 +9,7 @@ Chưa hoàn thiện: Nhận OTP ở trang quên mật khẩu; chưa làm dữ li
 Chưa hoàn thiện: Chưa làm dữ liệu giả (Service)
 
 --- Up 3: Sửa lại cấu trúc project cho gọn, thêm Service (dữ liệu giả) để test chức năng.
+
+### 11/11/2025
+--- Up 4: Hoàn thành các trang đăng ký, test các validation bằng service
+Chưa hoàn thiện: 1 số phần giao diện, tải lên ảnh/file

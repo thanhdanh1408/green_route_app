@@ -11,9 +11,10 @@ class AuthService {
     '0987654321': {
       'password': '12345678',
       'role': 'driver',
+      'hasRole': true,
       'name': 'Tài xế Nguyễn Văn Nam',
       'bank': 'Techcombank',
-      'email':'nam123@gmail.com',
+      'email': 'nam123@gmail.com',
       'accountNumber': '190378291234',
       'accountName': 'NGUYEN VAN NAM',
     },
@@ -21,15 +22,24 @@ class AuthService {
     '0977123456': {
       'password': '12345678',
       'role': 'shipper',
+      'hasRole': true,
       'name': 'Chủ hàng Trần Thị Lan',
       'bank': 'Vietcombank',
+      'email': 'lan321@gmail.com',
       'accountNumber': '0011001934567',
       'accountName': 'TRAN THI LAN',
+    },
+    '0901234567': {
+      'password': '12345678',
+      'role': null,
+      'hasRole': false, // CHƯA CÓ ROLE → PHẢI CHỌN
+      'name': 'Người dùng mới',
     },
     // Admin
     'admin': {
       'password': 'admin123',
       'role': 'admin',
+      'hasRole': true,
       'name': 'Quản trị viên',
       'bank': 'MBBank',
       'accountNumber': '888888888888',

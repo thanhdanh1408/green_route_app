@@ -26,6 +26,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  // Hàm điều hướng thông minh
+  void _navigateAfterLogin(Map<String, dynamic> user) {
+    final role = user['role'] as String?;
+    final hasRole = user['hasRole'] as bool? ?? false;
+
+    if (hasRole && role != null) {
+      // ĐÃ CÓ ROLE → VÀO THẲNG HOME THEO ROLE
+      if (role == 'driver') {
+        Navigator.pushNamedAndRemoveUntil(context, '/driver_home', (route) => false);
+      } else if (role == 'shipper') {
+        Navigator.pushNamedAndRemoveUntil(context, '/shipper_home', (route) => false);
+      } else if (role == 'admin') {
+        Navigator.pushNamedAndRemoveUntil(context, '/admin_home', (route) => false);
+      }
+    } else {
+      // CHƯA CÓ ROLE → ĐI CHỌN ROLE
+      Navigator.pushNamedAndRemoveUntil(context, '/role_selection', (route) => false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,12 +83,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                       // Ô nhập số điện thoại hoặc admin
                       AuthInputField(
-                        hint: 'Số điện thoại hoặc tên đăng nhập (admin)',
+                        hint: 'Số điện thoại',
                         controller: _identifierController,
                         keyboardType: TextInputType.phone,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Vui lòng nhập số điện thoại hoặc admin';
+                            return 'Vui lòng nhập số điện thoại';
                           }
                           if (value.trim() == 'admin') return null;
                           return Validators.validatePhone(value);
@@ -106,8 +126,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 backgroundColor: AppColors.primary,
                               ),
                             );
-                            // TODO: Chuyển đến Home theo role
-                            // Ví dụ: if (user['role'] == 'driver') → DriverHome()
+                            _navigateAfterLogin(user);
+                            
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

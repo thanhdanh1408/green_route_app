@@ -45,6 +45,12 @@ class AppTextStyle {
     fontWeight: FontWeight.w600,
     color: Colors.white,
   );
+
+  static const TextStyle subtitle = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: AppColors.primary,
+  );
 }
 
 class AppTheme {

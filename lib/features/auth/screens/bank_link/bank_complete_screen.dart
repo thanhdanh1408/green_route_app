@@ -25,7 +25,7 @@ class BankCompleteScreen extends StatelessWidget {
             const SizedBox(height: 50),
             CustomButton(
               label: 'Hoàn Thành',
-              onPressed: () => Navigator.popUntil(context, ModalRoute.withName('/login')),
+              onPressed: () => Navigator.popUntil(context, ModalRoute.withName('/role_selection')),
             ),
           ],
         ),

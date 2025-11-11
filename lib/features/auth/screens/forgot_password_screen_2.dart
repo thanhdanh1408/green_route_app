@@ -10,7 +10,8 @@ class ForgotPasswordScreen2 extends ConsumerStatefulWidget {
   const ForgotPasswordScreen2({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen2> createState() => _ForgotPasswordScreen2State();
+  ConsumerState<ForgotPasswordScreen2> createState() =>
+      _ForgotPasswordScreen2State();
 }
 
 class _ForgotPasswordScreen2State extends ConsumerState<ForgotPasswordScreen2> {
@@ -24,7 +25,10 @@ class _ForgotPasswordScreen2State extends ConsumerState<ForgotPasswordScreen2> {
     final phone = ref.watch(forgotPhoneProvider);
 
     return Scaffold(
-      appBar: AppBar(leading: const BackButton(), title: const Text("Đặt lại mật khẩu")),
+      appBar: AppBar(
+        leading: const BackButton(),
+        title: const Text("Đặt lại mật khẩu"),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppPadding.large),
         child: Column(
@@ -34,25 +38,27 @@ class _ForgotPasswordScreen2State extends ConsumerState<ForgotPasswordScreen2> {
             OtpInputField(onCompleted: (otp) => _enteredOtp = otp),
             const SizedBox(height: 30),
             CustomButton(
-              label: 'Xác nhận đặt lại mật khẩu',
+              label: 'Xác nhận',
               loading: _isLoading,
               onPressed: () async {
                 if (_enteredOtp != '123456') {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Mã OTP không đúng! Hãy nhập: 123456')),
+                    const SnackBar(
+                      content: Text('Mã OTP không đúng! Nhập: 123456'),
+                    ),
                   );
                   return;
                 }
 
                 setState(() => _isLoading = true);
-                final success = await AuthService.instance.resetPassword('12345678');
+                await Future.delayed(
+                  const Duration(seconds: 1),
+                ); // Giả lập xác minh
                 setState(() => _isLoading = false);
 
-                if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đặt lại mật khẩu thành công! Mật khẩu mới: 12345678')),
-                  );
-                  Navigator.popUntil(context, ModalRoute.withName('/login'));
+                if (mounted) {
+                  // CHUYỂN QUA TRANG NHẬP MẬT KHẨU MỚI
+                  Navigator.pushNamed(context, '/forgot3');
                 }
               },
             ),
