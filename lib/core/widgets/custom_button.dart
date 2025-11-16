@@ -1,69 +1,58 @@
+// lib/core/widgets/custom_button.dart
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-
-/// Reusable button with configurable parameters. Put at: lib/core/widgets/custom_button.dart
 
 class CustomButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
-  final Color? backgroundColor;
-  final Color? textColor;
+  final double? width;
   final double height;
-  final double radius;
-  final Widget? leading;
+  final Widget? leading; // ĐÃ THÊM LẠI
 
   const CustomButton({
     super.key,
     required this.label,
     this.onPressed,
     this.loading = false,
-    this.backgroundColor,
-    this.textColor,
+    this.width,
     this.height = 50,
-    this.radius = 12,
     this.leading,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? AppColors.primary;
-    final txt = textColor ?? Colors.white;
+    final isDisabled = onPressed == null || loading;
 
     return SizedBox(
-      width: double.infinity,
+      width: width ?? double.infinity,
       height: height,
       child: ElevatedButton(
-        onPressed: loading ? null : onPressed,
-        style: AppTheme.roundedButtonStyle(
-          backgroundColor: bg,
-          radius: radius,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        onPressed: isDisabled ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isDisabled ? Colors.grey[400] : AppColors.primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          elevation: isDisabled ? 0 : 4,
         ),
         child: loading
             ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               )
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (leading != null) ...[leading!, const SizedBox(width: 8)],
-                  Flexible(
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: txt,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                  if (leading != null) ...[
+                    leading!,
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),

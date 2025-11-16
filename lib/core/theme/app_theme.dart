@@ -110,17 +110,21 @@ class AppTheme {
   }
 
   static ButtonStyle roundedButtonStyle({
-    Color? backgroundColor,
-    double radius = 12.0,
+    required Color backgroundColor,
+    required double radius,
     EdgeInsetsGeometry? padding,
+    double? shadowElevation, // ĐÃ ĐỔI TÊN
   }) {
     return ElevatedButton.styleFrom(
-      backgroundColor: backgroundColor ?? AppColors.primary,
-      padding:
-          padding ?? const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+      backgroundColor: backgroundColor,
+      foregroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radius),
       ),
+      padding:
+          padding ?? const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      shadowColor: Colors.black26,
+      elevation: shadowElevation, // VẪN DÙNG elevation ở đây (Flutter tự map)
     );
   }
 }

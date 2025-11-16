@@ -29,20 +29,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // Hàm điều hướng thông minh
   void _navigateAfterLogin(Map<String, dynamic> user) {
     final role = user['role'] as String?;
-    final hasRole = user['hasRole'] as bool? ?? false;
+    final hasRoute = user['hasRoute'] as bool? ?? false;
 
-    if (hasRole && role != null) {
-      // ĐÃ CÓ ROLE → VÀO THẲNG HOME THEO ROLE
-      if (role == 'driver') {
-        Navigator.pushNamedAndRemoveUntil(context, '/driver_home', (route) => false);
-      } else if (role == 'shipper') {
-        Navigator.pushNamedAndRemoveUntil(context, '/shipper_home', (route) => false);
-      } else if (role == 'admin') {
-        Navigator.pushNamedAndRemoveUntil(context, '/admin_home', (route) => false);
-      }
-    } else {
-      // CHƯA CÓ ROLE → ĐI CHỌN ROLE
-      Navigator.pushNamedAndRemoveUntil(context, '/role_selection', (route) => false);
+    // Nếu không có role → về login (an toàn)
+    if (role == null) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      return;
+    }
+
+    // XỬ LÝ THEO ROLE – SẠCH & DỄ THÊM MỚI
+    switch (role) {
+      case 'driver':
+        final destination = hasRoute
+            ? '/driver_home'
+            : '/driver_route_selection';
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          destination,
+          (route) => false,
+        );
+        break;
+
+      case 'shipper':
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/shipper_home',
+          (route) => false,
+        );
+        break;
+
+      case 'admin':
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/admin_home',
+          (route) => false,
+        );
+        break;
+
+      default:
+        // Role không hợp lệ → về login
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Vai trò không hợp lệ!')));
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+        break;
     }
   }
 
@@ -52,10 +82,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/images/bg_road.png',
-            fit: BoxFit.cover,
-          ),
+          Image.asset('assets/images/bg_road.png', fit: BoxFit.cover),
           Container(color: Colors.black.withOpacity(0.5)),
           Padding(
             padding: const EdgeInsets.all(AppPadding.large),
@@ -116,7 +143,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           final identifier = _identifierController.text.trim();
                           final password = _passwordController.text;
 
-                          final user = await AuthService.instance.login(identifier, password);
+                          final user = await AuthService.instance.login(
+                            identifier,
+                            password,
+                          );
                           setState(() => _isLoading = false);
 
                           if (user != null && mounted) {
@@ -127,11 +157,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             );
                             _navigateAfterLogin(user);
-                            
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Sai số điện thoại hoặc mật khẩu'),
+                                content: Text(
+                                  'Sai số điện thoại hoặc mật khẩu',
+                                ),
                                 backgroundColor: AppColors.danger,
                               ),
                             );
@@ -141,7 +172,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                       // Quên mật khẩu
                       TextButton(
-                        onPressed: () => Navigator.pushNamed(context, '/forgot1'),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/forgot1'),
                         child: const Text(
                           'Quên mật khẩu?',
                           style: TextStyle(color: Colors.white),
@@ -157,7 +189,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: TextStyle(color: Colors.white),
                           ),
                           TextButton(
-                            onPressed: () => Navigator.pushNamed(context, '/register1'),
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/register1'),
                             child: Text(
                               'Đăng ký ngay',
                               style: TextStyle(color: AppColors.accent),

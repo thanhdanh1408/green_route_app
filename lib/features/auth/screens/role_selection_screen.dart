@@ -1,3 +1,4 @@
+// lib/features/auth/screens/role_selection_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
@@ -22,11 +23,7 @@ class RoleSelectionScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              'Bạn là ai ?',
-              style: AppTextStyle.headline2.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
+            Text('Bạn là ai ?', style: AppTextStyle.headline2.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const SizedBox(height: 60),
             CustomButton(
               label: 'Chủ hàng',

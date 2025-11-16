@@ -12,6 +12,7 @@ class AuthService {
       'password': '12345678',
       'role': 'driver',
       'hasRole': true,
+      'hasRoute': false, // CHƯA CÓ TUYẾN
       'name': 'Tài xế Nguyễn Văn Nam',
       'bank': 'Techcombank',
       'email': 'nam123@gmail.com',
@@ -33,6 +34,7 @@ class AuthService {
       'password': '12345678',
       'role': null,
       'hasRole': false, // CHƯA CÓ ROLE → PHẢI CHỌN
+      'hasRoute': false, // CHƯA CÓ TUYẾN
       'name': 'Người dùng mới',
     },
     // Admin

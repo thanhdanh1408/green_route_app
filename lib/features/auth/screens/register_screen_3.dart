@@ -41,8 +41,15 @@ class RegisterScreen3 extends StatelessWidget {
           Expanded(child: Text(text, style: AppTextStyle.body)),
           ElevatedButton(
             onPressed: () {},
-            style: AppTheme.roundedButtonStyle(backgroundColor: AppColors.primary),
-            child: const Text('Tải lên'),
+            style: AppTheme.roundedButtonStyle(
+              backgroundColor: AppColors.primary,
+              radius: 12, // BẮT BUỘC PHẢI CÓ
+              shadowElevation: 4,
+            ),
+            child: const Text(
+              'Tải lên',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

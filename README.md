@@ -13,3 +13,7 @@ Chưa hoàn thiện: Chưa làm dữ liệu giả (Service)
 ### 11/11/2025
 --- Up 4: Hoàn thành các trang đăng ký, test các validation bằng service
 Chưa hoàn thiện: 1 số phần giao diện, tải lên ảnh/file
+
+### 16/11/2025
+--- Up 5: Hoàn thành cơ bản Module tài xế
+Chưa hoàn thiện: Map lỗi, các chức năng chưa max ping

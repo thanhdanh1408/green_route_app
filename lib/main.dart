@@ -15,6 +15,9 @@ import 'features/auth/screens/role_selection_screen.dart';
 import 'features/auth/screens/register_shipper_screen.dart';
 import 'features/auth/screens/register_driver_screen.dart';
 import 'features/auth/screens/register_complete_screen.dart';
+import 'features/driver/screens/driver_route_selection_screen.dart';
+import 'features/driver/screens/driver_orders_screen.dart';
+import 'features/driver/screens/driver_home_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: GreenRouteApp()));
@@ -44,6 +47,10 @@ class GreenRouteApp extends StatelessWidget {
         '/register_shipper': (context) => const RegisterShipperScreen(),
         '/register_driver': (context) => const RegisterDriverScreen(),
         '/register_complete': (context) => const RegisterCompleteScreen(),
+
+        '/driver_route_selection': (context) => const DriverRouteSelectionScreen(),
+        '/driver_orders': (context) => DriverOrdersScreen(),
+        '/driver_home': (context) => DriverHomeScreen(),
       },
     );
   }
