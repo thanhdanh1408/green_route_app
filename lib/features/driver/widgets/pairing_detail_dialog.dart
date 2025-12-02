@@ -1,6 +1,5 @@
 // lib/features/driver/widgets/pairing_detail_dialog.dart
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../models/pairing_trip_model.dart';
 

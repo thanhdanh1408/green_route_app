@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:green_route_app/features/shipper/screens/shipper_home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen_1.dart';
 import 'features/auth/screens/register_screen_2.dart';
@@ -11,7 +12,6 @@ import 'features/auth/screens/bank_link/bank_link_screen.dart';
 import 'features/auth/screens/bank_link/bank_complete_screen.dart';
 import 'screens/splash_screen.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/screens/role_selection_screen.dart';
 import 'features/auth/screens/register_shipper_screen.dart';
 import 'features/auth/screens/register_driver_screen.dart';
 import 'features/auth/screens/register_complete_screen.dart';
@@ -43,7 +43,6 @@ class GreenRouteApp extends StatelessWidget {
         '/forgot3': (context) => const ForgotPasswordScreen3(),
         '/bank_link': (context) => const BankLinkScreen(),
         '/bank_complete': (context) => const BankCompleteScreen(),
-        '/role_selection': (context) => const RoleSelectionScreen(),
         '/register_shipper': (context) => const RegisterShipperScreen(),
         '/register_driver': (context) => const RegisterDriverScreen(),
         '/register_complete': (context) => const RegisterCompleteScreen(),
@@ -51,6 +50,8 @@ class GreenRouteApp extends StatelessWidget {
         '/driver_route_selection': (context) => const DriverRouteSelectionScreen(),
         '/driver_orders': (context) => DriverOrdersScreen(),
         '/driver_home': (context) => DriverHomeScreen(),
+
+        '/shipper_home': (context) => const ShipperHomeScreen(),
       },
     );
   }

@@ -1,25 +1,23 @@
 // lib/features/auth/services/auth_service.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   AuthService._();
   static final instance = AuthService._();
 
-  // CHỈ DÙNG SỐ ĐIỆN THOẠI LÀM KEY
   final Map<String, Map<String, dynamic>> fakeUsers = {
-    // Tài xế
     '0987654321': {
       'password': '12345678',
       'role': 'driver',
       'hasRole': true,
-      'hasRoute': false, // CHƯA CÓ TUYẾN
+      'hasRoute': false,
       'name': 'Tài xế Nguyễn Văn Nam',
       'bank': 'Techcombank',
       'email': 'nam123@gmail.com',
       'accountNumber': '190378291234',
       'accountName': 'NGUYEN VAN NAM',
     },
-    // Chủ hàng
     '0977123456': {
       'password': '12345678',
       'role': 'shipper',
@@ -33,11 +31,10 @@ class AuthService {
     '0901234567': {
       'password': '12345678',
       'role': null,
-      'hasRole': false, // CHƯA CÓ ROLE → PHẢI CHỌN
-      'hasRoute': false, // CHƯA CÓ TUYẾN
+      'hasRole': false,
+      'hasRoute': false,
       'name': 'Người dùng mới',
     },
-    // Admin
     'admin': {
       'password': 'admin123',
       'role': 'admin',
@@ -50,9 +47,7 @@ class AuthService {
   };
 
   String? _lastSentPhone;
-  String? _lastOtp = '123456';
 
-  // Gửi OTP
   Future<bool> sendOtp(String input) async {
     await Future.delayed(const Duration(seconds: 2));
     final phone = _normalizePhone(input);
@@ -64,13 +59,11 @@ class AuthService {
     return false;
   }
 
-  // Xác minh OTP
   Future<bool> verifyOtp(String otp) async {
     await Future.delayed(const Duration(seconds: 1));
     return otp == '123456';
   }
 
-  // Đặt lại mật khẩu
   Future<bool> resetPassword(String newPass) async {
     await Future.delayed(const Duration(seconds: 1));
     if (_lastSentPhone != null && fakeUsers.containsKey(_lastSentPhone!)) {
@@ -80,45 +73,63 @@ class AuthService {
     return false;
   }
 
-  // ĐĂNG NHẬP – CHỈ DÙNG SỐ ĐIỆN THOẠI HOẶC "admin"
-  Future<Map<String, dynamic>?> login(
-    String identifier,
-    String password,
-  ) async {
+  // ĐĂNG NHẬP
+  Future<Map<String, dynamic>?> login(String identifier, String password) async {
     await Future.delayed(const Duration(seconds: 1));
-
     final input = identifier.trim();
     final phone = _normalizePhone(input);
 
-    // Trường hợp nhập "admin"
     if (input == 'admin' && fakeUsers['admin']!['password'] == password) {
-      debugPrint('Đăng nhập thành công: Admin');
       return fakeUsers['admin'];
     }
 
-    // Trường hợp nhập số điện thoại
-    if (phone != null &&
-        fakeUsers.containsKey(phone) &&
-        fakeUsers[phone]!['password'] == password) {
-      debugPrint('Đăng nhập thành công: ${fakeUsers[phone]!['name']}');
+    if (phone != null && fakeUsers.containsKey(phone) && fakeUsers[phone]!['password'] == password) {
       return fakeUsers[phone];
     }
-
-    debugPrint('Đăng nhập thất bại: $input');
     return null;
   }
 
-  // Helper: chuẩn hóa số điện thoại về dạng 0...
+  // CẬP NHẬT ROLE CHO NGƯỜI DÙNG MỚI
+  Future<bool> updateRole(String phone, String role) async {
+    final normalized = _normalizePhone(phone) ?? phone;
+    if (fakeUsers.containsKey(normalized)) {
+      fakeUsers[normalized]!['role'] = role;
+      fakeUsers[normalized]!['hasRole'] = true;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_role', role);
+      await prefs.setString('user_phone', normalized);
+
+      debugPrint('Cập nhật role: $normalized → $role');
+      return true;
+    }
+    return false;
+  }
+
   String? _normalizePhone(String input) {
     final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length < 10) return null;
-    if (digits.startsWith('84')) {
-      return '0${digits.substring(2)}';
-    } else if (digits.startsWith('+84')) {
-      return '0${digits.substring(3)}';
-    } else if (digits.startsWith('0')) {
-      return digits;
-    }
+    if (digits.startsWith('84')) return '0${digits.substring(2)}';
+    if (digits.startsWith('+84')) return '0${digits.substring(3)}';
+    if (digits.startsWith('0')) return digits;
     return null;
+  }
+
+  // ĐĂNG XUẤT
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_role');
+    await prefs.remove('user_phone');
+    await prefs.remove('name');
+    await prefs.remove('phone');
+    await prefs.remove('id');
+    await prefs.remove('plate');
+    await prefs.remove('vehicle_type');
+    await prefs.remove('capacity');
+    await prefs.remove('area');
+    await prefs.remove('bank');
+    await prefs.remove('account');
+    await prefs.remove('account_name');
+    debugPrint('Đã đăng xuất và xóa dữ liệu người dùng');
   }
 }

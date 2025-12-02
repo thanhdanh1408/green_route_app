@@ -4,7 +4,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../widgets/otp_input_field.dart';
 import '../../../core/providers/forgot_password_provider.dart';
-import '../services/auth_service.dart';
 
 class ForgotPasswordScreen2 extends ConsumerStatefulWidget {
   const ForgotPasswordScreen2({super.key});

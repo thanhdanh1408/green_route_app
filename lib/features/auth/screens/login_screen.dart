@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:green_route_app/features/auth/screens/role_selection_screen.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../widgets/auth_input_field.dart';
@@ -27,54 +28,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   // Hàm điều hướng thông minh
-  void _navigateAfterLogin(Map<String, dynamic> user) {
-    final role = user['role'] as String?;
-    final hasRoute = user['hasRoute'] as bool? ?? false;
+  void _navigateAfterLogin(Map<String, dynamic> user) async {
+  final role = user['role'] as String?;
+  final hasRole = user['hasRole'] as bool? ?? false;
 
-    // Nếu không có role → về login (an toàn)
-    if (role == null) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-      return;
-    }
-
-    // XỬ LÝ THEO ROLE – SẠCH & DỄ THÊM MỚI
-    switch (role) {
-      case 'driver':
-        final destination = hasRoute
-            ? '/driver_home'
-            : '/driver_route_selection';
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          destination,
-          (route) => false,
-        );
-        break;
-
-      case 'shipper':
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/shipper_home',
-          (route) => false,
-        );
-        break;
-
-      case 'admin':
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/admin_home',
-          (route) => false,
-        );
-        break;
-
-      default:
-        // Role không hợp lệ → về login
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Vai trò không hợp lệ!')));
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-        break;
-    }
+  if (role == null || !hasRole) {
+    // LẦN ĐẦU → CHỌN ROLE
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => RoleSelectionScreen(phone: _identifierController.text.trim())),
+      (route) => false,
+    );
+    return;
   }
+
+  switch (role) {
+    case 'driver':
+      final destination = user['hasRoute'] == true ? '/driver_home' : '/driver_route_selection';
+      Navigator.pushNamedAndRemoveUntil(context, destination, (route) => false);
+      break;
+    case 'shipper':
+      Navigator.pushNamedAndRemoveUntil(context, '/shipper_home', (route) => false);
+      break;
+    case 'admin':
+      Navigator.pushNamedAndRemoveUntil(context, '/admin_home', (route) => false);
+      break;
+    default:
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vai trò không hợp lệ!')));
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {

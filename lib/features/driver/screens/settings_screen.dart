@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../auth/services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -93,53 +94,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Cài đặt', style: TextStyle(color: Colors.white)),
         centerTitle: true,
       ),
-      body: _nameCtrl == null
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Quản lý thông tin cá nhân và xe', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                    const SizedBox(height: 24),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Quản lý thông tin cá nhân và xe', style: TextStyle(fontSize: 16, color: Colors.grey)),
+              const SizedBox(height: 24),
 
-                    // THÔNG TIN CÁ NHÂN
-                    _infoSection('Thông tin cá nhân', [
-                      _textField(_nameCtrl, 'Họ và tên', validator: (v) => v!.isEmpty ? 'Nhập họ tên' : null),
-                      _textField(_phoneCtrl, 'Số điện thoại', keyboardType: TextInputType.phone, validator: (v) => v!.length < 10 ? 'SĐT không hợp lệ' : null),
-                      _textField(_idCtrl, 'CMND/CCCD', keyboardType: TextInputType.number, validator: (v) => v!.length < 9 ? 'CMND không hợp lệ' : null),
-                    ]),
+              // THÔNG TIN CÁ NHÂN
+              _infoSection('Thông tin cá nhân', [
+                _textField(_nameCtrl, 'Họ và tên', validator: (v) => v!.isEmpty ? 'Nhập họ tên' : null),
+                _textField(_phoneCtrl, 'Số điện thoại', keyboardType: TextInputType.phone, validator: (v) => v!.length < 10 ? 'SĐT không hợp lệ' : null),
+                _textField(_idCtrl, 'CMND/CCCD', keyboardType: TextInputType.number, validator: (v) => v!.length < 9 ? 'CMND không hợp lệ' : null),
+              ]),
 
-                    const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-                    // THÔNG TIN XE
-                    _infoSection('Thông tin xe', [
-                      _textField(_plateCtrl, 'Biển số xe', validator: (v) => v!.isEmpty ? 'Nhập biển số' : null),
-                      _textField(_vehicleTypeCtrl, 'Loại xe'),
-                      _textField(_capacityCtrl, 'Tải trọng'),
-                      _textField(_areaCtrl, 'Khu vực hoạt động'),
-                    ]),
+              // THÔNG TIN XE
+              _infoSection('Thông tin xe', [
+                _textField(_plateCtrl, 'Biển số xe', validator: (v) => v!.isEmpty ? 'Nhập biển số' : null),
+                _textField(_vehicleTypeCtrl, 'Loại xe'),
+                _textField(_capacityCtrl, 'Tải trọng'),
+                _textField(_areaCtrl, 'Khu vực hoạt động'),
+              ]),
 
-                    const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-                    // TÀI KHOẢN NGÂN HÀNG
-                    _infoSection('Tài khoản ngân hàng', [
-                      _textField(_bankCtrl, 'Ngân hàng'),
-                      _textField(_accountCtrl, 'Số tài khoản'),
-                      _textField(_accountNameCtrl, 'Chủ tài khoản'),
-                    ]),
+              // TÀI KHOẢN NGÂN HÀNG
+              _infoSection('Tài khoản ngân hàng', [
+                _textField(_bankCtrl, 'Ngân hàng'),
+                _textField(_accountCtrl, 'Số tài khoản'),
+                _textField(_accountNameCtrl, 'Chủ tài khoản'),
+              ]),
 
-                    const SizedBox(height: 32),
-                    CustomButton(
-                      label: 'Lưu tất cả thay đổi',
-                      onPressed: _saveData,
-                    ),
-                  ],
+              const SizedBox(height: 32),
+              CustomButton(
+                label: 'Lưu tất cả thay đổi',
+                onPressed: _saveData,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await AuthService.instance.logout();
+                  Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                },
+                icon: const Icon(Icons.logout, color: Colors.white),
+                label: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

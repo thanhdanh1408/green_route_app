@@ -1,14 +1,13 @@
 // lib/features/driver/screens/driver_home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:green_route_app/features/driver/screens/history_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
-import '../screens/driver_route_selection_screen.dart';
-import '../screens/driver_orders_screen.dart';
-import '../screens/pairing_screen.dart';
-import '../screens/history_screen.dart';
-import '../screens/wallet_screen.dart';
-import '../screens/settings_screen.dart';
-
+import 'driver_route_selection_screen.dart';
+import 'driver_orders_screen.dart';
+import 'available_orders_screen.dart';
+import 'wallet_screen.dart';
+import 'settings_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -38,17 +37,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     });
   }
 
-  // CÁC TRANG TƯƠNG ỨNG VỚI TỪNG TAB – ĐÃ THÊM PairingScreen()
+  // CÁC TRANG CHÍNH – ĐÃ CẬP NHẬT ĐÚNG THỨ TỰ
   late final List<Widget> _pages = [
-    _hasRoute
-        ? const DriverOrdersScreen()
-        : const DriverRouteSelectionScreen(),
-    const PairingScreen(), 
+    // Tab 0: Đơn hàng (nếu đã chọn tuyến) hoặc Chọn tuyến
+    _hasRoute ? const DriverOrdersScreen() : const DriverRouteSelectionScreen(),
+
+    // Tab 1: Ghép hàng → HIỆN TẤT CẢ ĐƠN TỪ CHỦ HÀNG (TÌM TÀI XẾ + GHÉP HÀNG)
+    const DriverAvailableOrdersScreen(),   // ← ĐÂY LÀ MÀN HÌNH MỚI CHỈ CẦN DÁN
+
+    // Tab 2: Lịch sử
     const HistoryScreen(),
+
+    // Tab 3: Ví tiền
     const WalletScreen(),
+
+    // Tab 4: Cài đặt
     const SettingsScreen(),
-    const Center(child: Text('Ví tiền & thanh toán', style: AppTextStyle.headline2)),
-    const Center(child: Text('Cài đặt tài khoản', style: AppTextStyle.headline2)),
   ];
 
   @override
@@ -64,20 +68,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         index: _currentIndex,
         children: _pages,
       ),
+
+      floatingActionButton: _currentIndex == 1 // Chỉ hiện ở tab Ghép hàng
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primary,
+              onPressed: () {
+                // Kéo xuống làm mới danh sách đơn
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đang làm mới danh sách đơn...')),
+                );
+                setState(() {}); // Tạm thời – sau này dùng Stream/Firebase
+              },
+              child: const Icon(Icons.refresh, color: Colors.white),
+            )
+          : null,
+
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey[600],
         onTap: (index) {
-          setState(() => _currentIndex = index);
-          // Nếu chưa có tuyến mà bấm tab khác → vẫn bắt chọn tuyến trước
+          // Nếu chưa chọn tuyến → chỉ được ở tab 0
           if (!_hasRoute && index != 0) {
-            setState(() => _currentIndex = 0);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Vui lòng chọn tuyến hoạt động trước!')),
             );
+            return;
           }
+
+          setState(() => _currentIndex = index);
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Đơn hàng'),
