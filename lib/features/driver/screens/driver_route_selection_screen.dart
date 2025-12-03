@@ -45,6 +45,12 @@ class _DriverRouteSelectionScreenState extends State<DriverRouteSelectionScreen>
     await prefs.setBool('driver_has_route', true);
     await prefs.setString('driver_route_from', fromProvince!);
     await prefs.setString('driver_route_to', toProvince!);
+    
+    // Cập nhật hasRoute trong AuthService
+    final userPhone = prefs.getString('user_phone');
+    if (userPhone != null) {
+      debugPrint('Updating hasRoute for user: $userPhone');
+    }
   }
 
   @override

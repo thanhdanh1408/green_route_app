@@ -70,6 +70,8 @@ class OrderCard extends StatelessWidget {
             _buildInfoRow('Từ:', order.fromDetail),
             _buildInfoRow('Đến:', order.toDetail),
             _buildInfoRow('Tải trọng:', '${order.weight} tấn'),
+            if (order.shipperName != null) _buildInfoRow('Chủ hàng:', order.shipperName!),
+            if (order.shipperPhone != null) _buildInfoRow('SĐT chủ hàng:', order.shipperPhone!),
             const SizedBox(height: 12),
 
             // GIÁ + NGÀY

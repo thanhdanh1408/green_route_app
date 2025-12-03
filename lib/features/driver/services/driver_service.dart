@@ -19,6 +19,8 @@ class DriverService {
         price: '3.500.000 đ',
         receiveDate: '25/11/2025',
         deliverDate: '26/11/2025',
+        shipperName: 'Chủ hàng Trần Thị Lan',
+        shipperPhone: '0977123456',
       ),
       OrderModel(
         id: 'GH002',
@@ -30,6 +32,8 @@ class DriverService {
         price: '4.200.000 đ',
         receiveDate: '24/11/2025',
         deliverDate: '27/11/2025',
+        shipperName: 'Công ty ABC',
+        shipperPhone: '0935123456',
       ),
     ];
   }

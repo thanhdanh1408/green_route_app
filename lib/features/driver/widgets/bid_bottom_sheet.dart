@@ -22,13 +22,30 @@ class BidBottomSheet extends StatefulWidget {
 }
 
 class _BidBottomSheetState extends State<BidBottomSheet> {
-  String selectedPrice = '3.500.000 đ';
+  late String selectedPrice;
 
-  final Map<String, String> prices = {
-    'Thấp': '3.150.000 đ',
-    'Trung bình': '3.500.000 đ',
-    'Cao': '3.850.000 đ',
-  };
+  late Map<String, String> prices;
+
+  @override
+  void initState() {
+    super.initState();
+    // Parse giá từ order (ví dụ: "4.200.000 đ" → 4200000)
+    final priceStr = widget.order.price.replaceAll(RegExp(r'[^\d]'), '');
+    final priceNum = int.tryParse(priceStr) ?? 3500000;
+    
+    // Tính toán giá dựa trên giá đề xuất
+    final low = priceNum - 300000; // Giảm 300k
+    final mid = priceNum;          // Bằng giá đề xuất
+    final high = priceNum + 300000; // Tăng 300k
+
+    prices = {
+      'Thấp': '${low.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
+      'Trung bình': '${mid.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
+      'Cao': '${high.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
+    };
+
+    selectedPrice = prices['Trung bình']!; // Default là trung bình
+  }
 
   @override
   Widget build(BuildContext context) {

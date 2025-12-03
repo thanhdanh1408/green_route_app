@@ -11,6 +11,8 @@ class OrderModel {
   final String price;
   final String receiveDate;
   final String deliverDate;
+  final String? shipperName;
+  final String? shipperPhone;
 
   const OrderModel({
     required this.id,
@@ -22,6 +24,8 @@ class OrderModel {
     required this.price,
     required this.receiveDate,
     required this.deliverDate,
+    this.shipperName,
+    this.shipperPhone,
   });
 
   // CHUYỂN THÀNH MAP ĐỂ LƯU SHARED_PREFERENCES
@@ -36,6 +40,8 @@ class OrderModel {
       'price': price,
       'receiveDate': receiveDate,
       'deliverDate': deliverDate,
+      'shipperName': shipperName,
+      'shipperPhone': shipperPhone,
     };
   }
 
@@ -51,6 +57,8 @@ class OrderModel {
       price: map['price'] as String,
       receiveDate: map['receiveDate'] as String,
       deliverDate: map['deliverDate'] as String,
+      shipperName: map['shipperName'] as String?,
+      shipperPhone: map['shipperPhone'] as String?,
     );
   }
 

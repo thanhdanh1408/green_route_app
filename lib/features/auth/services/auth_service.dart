@@ -11,7 +11,7 @@ class AuthService {
       'password': '12345678',
       'role': 'driver',
       'hasRole': true,
-      'hasRoute': false,
+      'hasRoute': true,  // ← Đặt true vì đã chọn tuyến trước đó
       'name': 'Tài xế Nguyễn Văn Nam',
       'address': 'Gia Lai',
       'bank': 'Techcombank',
@@ -239,6 +239,7 @@ class AuthService {
     await prefs.remove('accepted_orders');
     await prefs.remove('waiting_orders');
     await prefs.remove('completed_orders');
+    await prefs.remove('shipper_received_bids');
     debugPrint('Đã đăng xuất và xóa dữ liệu người dùng');
   }
 }
