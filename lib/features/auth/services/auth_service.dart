@@ -233,6 +233,12 @@ class AuthService {
     await prefs.remove('bank');
     await prefs.remove('account');
     await prefs.remove('account_name');
+    await prefs.remove('temp_phone');
+    await prefs.remove('temp_password');
+    await prefs.remove('bidding_orders');
+    await prefs.remove('accepted_orders');
+    await prefs.remove('waiting_orders');
+    await prefs.remove('completed_orders');
     debugPrint('Đã đăng xuất và xóa dữ liệu người dùng');
   }
 }

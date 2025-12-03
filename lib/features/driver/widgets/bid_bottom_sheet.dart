@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../models/order_model.dart';
 import 'bid_pending_dialog.dart';
+import '../services/order_status_service.dart';
 
 class BidBottomSheet extends StatefulWidget {
   final OrderModel order;
@@ -115,7 +116,11 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                 Expanded(
                   child: CustomButton(
                     label: 'Gửi giá đấu thầu',
-                    onPressed: () {
+                    onPressed: () async {
+                      // Lưu đơn vào trạng thái "Đang chờ"
+                      await OrderStatusService.addWaitingOrder(widget.order);
+
+                      if (!mounted) return;
                       Navigator.pop(context);
                       showDialog(context: context, builder: (_) => const BidPendingDialog());
 
@@ -126,6 +131,8 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
 
                         // Giả lập: 70% trúng thầu
                         if (DateTime.now().millisecond % 10 < 7) {
+                          // Chuyển từ waiting sang accepted
+                          OrderStatusService.acceptOrder(widget.order.id);
                           widget.onBidAccepted?.call();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Chúc mừng! Bạn đã trúng thầu!'), backgroundColor: Colors.green),

@@ -1,43 +1,83 @@
 // lib/features/driver/screens/history_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
-import 'trip_tracking_screen.dart'; // MỚI
+import 'trip_tracking_screen.dart';
+import '../services/order_status_service.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
-  final List<Map<String, dynamic>> trips = const [
-    {
-      'id': 'GH999',
-      'route': 'Gia Lai - Đắk Lắk',
-      'cargo': 'Cà phê - 5 tấn',
-      'date': '03-11-2025',
-      'status': 'Hoàn thành',
-      'statusColor': Colors.green,
-      'price': '3.500.000 đ',
-      'progress': 4,
-    },
-    {
-      'id': 'GH998',
-      'route': 'Gia Lai - Đắk Lắk',
-      'cargo': 'Tiêu xanh - 5 tấn',
-      'date': '02-11-2025',
-      'status': 'Đang vận chuyển',
-      'statusColor': Colors.orange,
-      'price': '2.500.000 đ',
-      'progress': 2,
-    },
-    {
-      'id': 'GH997',
-      'route': 'Gia Lai - Đắk Lắk',
-      'cargo': 'Hàng hóa',
-      'date': '02-11-2025',
-      'status': 'Thất bại',
-      'statusColor': Colors.red,
-      'price': '2.500.000 đ',
-      'progress': 0,
-    },
-  ];
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  List<Map<String, dynamic>> allTrips = [];
+  List<Map<String, dynamic>> waitingTrips = [];
+  List<Map<String, dynamic>> completedTrips = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // Lấy đơn đang chờ
+    final waitingOrders = await OrderStatusService.getWaitingOrders();
+    final waiting = waitingOrders.map((order) {
+      return {
+        'id': order.id,
+        'route': '${order.from} - ${order.to}',
+        'cargo': '${order.weight}',
+        'date': DateTime.now().toString().split(' ')[0],
+        'status': 'Đang chờ',
+        'statusColor': Colors.blue,
+        'price': order.price,
+        'progress': 0,
+      };
+    }).toList();
+
+    // Danh sách đơn hoàn thành (hardcoded)
+    final completed = [
+      {
+        'id': 'GH999',
+        'route': 'Gia Lai - Đắk Lắk',
+        'cargo': 'Cà phê - 5 tấn',
+        'date': '03-11-2025',
+        'status': 'Hoàn thành',
+        'statusColor': Colors.green,
+        'price': '3.500.000 đ',
+        'progress': 4,
+      },
+      {
+        'id': 'GH998',
+        'route': 'Gia Lai - Đắk Lắk',
+        'cargo': 'Tiêu xanh - 5 tấn',
+        'date': '02-11-2025',
+        'status': 'Đang vận chuyển',
+        'statusColor': Colors.orange,
+        'price': '2.500.000 đ',
+        'progress': 2,
+      },
+      {
+        'id': 'GH997',
+        'route': 'Gia Lai - Đắk Lắk',
+        'cargo': 'Hàng hóa',
+        'date': '02-11-2025',
+        'status': 'Thất bại',
+        'statusColor': Colors.red,
+        'price': '2.500.000 đ',
+        'progress': 0,
+      },
+    ];
+
+    setState(() {
+      waitingTrips = waiting;
+      completedTrips = completed;
+      allTrips = [...waiting, ...completed];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,9 +97,9 @@ class HistoryScreen extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: trips.length,
+              itemCount: allTrips.length,
               itemBuilder: (context, i) {
-                final trip = trips[i];
+                final trip = allTrips[i];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
