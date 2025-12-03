@@ -39,17 +39,27 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
     // 2. Load stored driver orders (với bidStatus)
     final storedOrders = await OrderStatusService.getAllOrders();
 
-    // 3. Merge: Thay thế available orders bằng stored nếu tồn tại, giữ lại các orders khác
+    // 3. Load completed orders
+    final completedOrders = await OrderStatusService.getCompletedOrders();
+
+    // 4. Merge: 
+    // - Thêm all stored orders (waiting/accepted)
+    // - Thêm completed orders (transporting)
+    // - Thêm available orders chỉ nếu chưa bid/completed
     final mergedOrders = <OrderModel>[];
 
-    // Thêm stored orders trước (với bidStatus khác 'available')
+    // Thêm stored orders (waiting/accepted)
     for (final stored in storedOrders) {
       mergedOrders.add(stored);
     }
 
-    // Thêm available orders (chỉ những cái chưa bid)
+    // Thêm completed orders
+    // Không thêm vào danh sách main - chỉ show ở history screen
+
+    // Thêm available orders (chỉ những cái chưa bid/completed)
+    final allBiddedOrderIds = {...storedOrders.map((s) => s.id), ...completedOrders.map((c) => c.id)};
     for (final available in availableOrders) {
-      if (!storedOrders.any((s) => s.id == available.id)) {
+      if (!allBiddedOrderIds.contains(available.id)) {
         mergedOrders.add(available.copyWith(bidStatus: 'available'));
       }
     }

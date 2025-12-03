@@ -1,5 +1,6 @@
 // lib/features/driver/screens/history_screen.dart
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 import 'trip_tracking_screen.dart';
 import '../services/order_status_service.dart';
@@ -15,11 +16,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<Map<String, dynamic>> allTrips = [];
   List<Map<String, dynamic>> waitingTrips = [];
   List<Map<String, dynamic>> completedTrips = [];
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    // Auto-reload every 2 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _loadData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -38,39 +50,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
       };
     }).toList();
 
-    // Danh sách đơn hoàn thành (hardcoded)
-    final completed = [
-      {
-        'id': 'GH999',
-        'route': 'Gia Lai - Đắk Lắk',
-        'cargo': 'Cà phê - 5 tấn',
-        'date': '03-11-2025',
-        'status': 'Hoàn thành',
-        'statusColor': Colors.green,
-        'price': '3.500.000 đ',
-        'progress': 4,
-      },
-      {
-        'id': 'GH998',
-        'route': 'Gia Lai - Đắk Lắk',
-        'cargo': 'Tiêu xanh - 5 tấn',
-        'date': '02-11-2025',
-        'status': 'Đang vận chuyển',
-        'statusColor': Colors.orange,
-        'price': '2.500.000 đ',
-        'progress': 2,
-      },
-      {
-        'id': 'GH997',
-        'route': 'Gia Lai - Đắk Lắk',
-        'cargo': 'Hàng hóa',
-        'date': '02-11-2025',
-        'status': 'Thất bại',
-        'statusColor': Colors.red,
-        'price': '2.500.000 đ',
-        'progress': 0,
-      },
-    ];
+    // Lấy đơn đã hoàn tất (từ completed_orders)
+    final completedOrders = await OrderStatusService.getCompletedOrders();
+    final completed = completedOrders.map((order) {
+      return {
+        'id': order.id,
+        'route': '${order.from} - ${order.to}',
+        'cargo': '${order.weight}',
+        'date': DateTime.now().toString().split(' ')[0],
+        'status': order.bidStatus == 'transporting' ? 'Đang vận chuyển' : 'Hoàn thành',
+        'statusColor': order.bidStatus == 'transporting' ? Colors.orange : Colors.green,
+        'price': order.price,
+        'progress': order.bidStatus == 'transporting' ? 2 : 4,
+      };
+    }).toList();
 
     setState(() {
       waitingTrips = waiting;
