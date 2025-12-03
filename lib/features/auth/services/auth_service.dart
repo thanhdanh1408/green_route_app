@@ -235,11 +235,20 @@ class AuthService {
     await prefs.remove('account_name');
     await prefs.remove('temp_phone');
     await prefs.remove('temp_password');
+    // ⚠️ KHÔNG xóa bidding_orders, waiting_orders, accepted_orders, completed_orders
+    // Vì chúng là dữ liệu lâu dài, không phải session data
+    // Chỉ xóa khi user thực sự muốn reset
+    debugPrint('Đã đăng xuất và xóa session data');
+  }
+
+  // CLEAR ALL DATA (khi user yêu cầu reset)
+  Future<void> clearAllOrderData() async {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.remove('bidding_orders');
     await prefs.remove('accepted_orders');
     await prefs.remove('waiting_orders');
     await prefs.remove('completed_orders');
     await prefs.remove('shipper_received_bids');
-    debugPrint('Đã đăng xuất và xóa dữ liệu người dùng');
+    debugPrint('Đã xóa tất cả dữ liệu đơn hàng');
   }
 }

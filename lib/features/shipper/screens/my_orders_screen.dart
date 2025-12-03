@@ -2,9 +2,30 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/order_pool_service.dart';
+import '../../driver/services/order_status_service.dart';
 
-class MyOrdersScreen extends StatelessWidget {
+class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
+
+  @override
+  State<MyOrdersScreen> createState() => _MyOrdersScreenState();
+}
+
+class _MyOrdersScreenState extends State<MyOrdersScreen> {
+  List<Map<String, dynamic>> driverBids = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDriverBids();
+  }
+
+  Future<void> _loadDriverBids() async {
+    final bids = await OrderStatusService.getShipperBids();
+    setState(() {
+      driverBids = bids;
+    });
+  }
 
   void _showOrderResult(BuildContext context, PooledOrder order) {
     if (order.hasSeenResult) return;
@@ -68,6 +89,64 @@ class MyOrdersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          // Tabs
+          TabBar(
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.list_alt),
+                    const SizedBox(width: 8),
+                    const Text('Đơn hàng'),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.people),
+                    const SizedBox(width: 8),
+                    const Text('Bids từ tài xế'),
+                    if (driverBids.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${driverBids.length}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                // Tab 1: Đơn hàng của tôi
+                _buildOrdersTab(),
+                // Tab 2: Bids từ tài xế
+                _buildBidsTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrdersTab() {
     return ValueListenableBuilder<List<PooledOrder>>(
       valueListenable: OrderPoolService.instance.ordersNotifier,
       builder: (context, orders, _) {
@@ -112,6 +191,154 @@ class MyOrdersScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _buildBidsTab() {
+    return RefreshIndicator(
+      onRefresh: _loadDriverBids,
+      child: driverBids.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('Chưa có bids từ tài xế', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: driverBids.length,
+              itemBuilder: (_, i) {
+                final bid = driverBids[i];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              child: Icon(Icons.person, color: AppColors.primary),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    bid['driverName'] ?? 'Tài xế',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Text(
+                                    bid['driverPhone'] ?? '',
+                                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[100],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                bid['status'] == 'pending' ? 'Đang chờ' : 'Đã chọn',
+                                style: TextStyle(
+                                  color: Colors.blue[800],
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(),
+                        const SizedBox(height: 12),
+
+                        // Bid details
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Đơn hàng', style: TextStyle(color: Colors.grey[600])),
+                                Text(bid['orderId'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('Giá đề xuất', style: TextStyle(color: Colors.grey[600])),
+                                Text(
+                                  bid['bidPrice'] ?? '',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Buttons
+                        if (bid['status'] == 'pending')
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Đã từ chối bid này')),
+                                    );
+                                    setState(() {
+                                      driverBids.removeAt(i);
+                                    });
+                                  },
+                                  child: const Text('Từ chối'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Đã chọn ${bid['driverName']} giao hàng'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    setState(() {
+                                      bid['status'] = 'accepted';
+                                    });
+                                  },
+                                  child: const Text('Chấp nhận'),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
