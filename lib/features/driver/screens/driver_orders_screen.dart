@@ -1,6 +1,7 @@
 // lib/features/driver/screens/driver_orders_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/order_card.dart';
 import '../models/order_model.dart';
@@ -17,11 +18,22 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
   List<OrderModel> orders = [];
   Set<String> biddingOrders = {};
   List<OrderModel> acceptedOrders = [];
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadAllData();
+    // Reload dữ liệu mỗi 2 giây để kiểm tra xem chủ hàng có chấp nhận bid hay không
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _loadAllData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAllData() async {
