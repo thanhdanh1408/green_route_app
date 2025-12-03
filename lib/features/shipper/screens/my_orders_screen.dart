@@ -317,7 +317,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () {
+                                  onPressed: () async {
+                                    // Cập nhật trạng thái đơn hàng ở phía tài xế
+                                    final orderId = bid['orderId'] as String;
+                                    await OrderStatusService.acceptOrder(orderId);
+
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text('Đã chọn ${bid['driverName']} giao hàng'),

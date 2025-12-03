@@ -58,43 +58,48 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              final isBidding = biddingOrders.contains(order.id);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: OrderCard(
-                  order: order,
-                  isBidding: isBidding,
-                  onBid: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => BidBottomSheet(
-                        order: order,
-                        onBidSubmitted: () async {
-                          await _saveBidding(order.id);
-                          setState(() => biddingOrders.add(order.id));
-                        },
-                        onBidAccepted: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          acceptedOrders.add(order);
-                          await prefs.setStringList(
-                            'accepted_orders',
-                            acceptedOrders.map((e) => e.toJson()).toList(),
-                          );
-                          setState(() {});
-                        },
-                      ),
-                    );
-                  },
-                ),
-              );
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadAllData();
             },
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: orders.length,
+              itemBuilder: (context, index) {
+                final order = orders[index];
+                final isBidding = biddingOrders.contains(order.id);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: OrderCard(
+                    order: order,
+                    isBidding: isBidding,
+                    onBid: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => BidBottomSheet(
+                          order: order,
+                          onBidSubmitted: () async {
+                            await _saveBidding(order.id);
+                            setState(() => biddingOrders.add(order.id));
+                          },
+                          onBidAccepted: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            acceptedOrders.add(order);
+                            await prefs.setStringList(
+                              'accepted_orders',
+                              acceptedOrders.map((e) => e.toJson()).toList(),
+                            );
+                            setState(() {});
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ],
