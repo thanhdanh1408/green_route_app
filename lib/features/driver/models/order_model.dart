@@ -13,6 +13,7 @@ class OrderModel {
   final String deliverDate;
   final String? shipperName;
   final String? shipperPhone;
+  final String bidStatus; // 'available' | 'waiting' | 'accepted' | 'completed'
 
   const OrderModel({
     required this.id,
@@ -26,6 +27,7 @@ class OrderModel {
     required this.deliverDate,
     this.shipperName,
     this.shipperPhone,
+    this.bidStatus = 'available',
   });
 
   // CHUYỂN THÀNH MAP ĐỂ LƯU SHARED_PREFERENCES
@@ -42,6 +44,7 @@ class OrderModel {
       'deliverDate': deliverDate,
       'shipperName': shipperName,
       'shipperPhone': shipperPhone,
+      'bidStatus': bidStatus,
     };
   }
 
@@ -59,6 +62,7 @@ class OrderModel {
       deliverDate: map['deliverDate'] as String,
       shipperName: map['shipperName'] as String?,
       shipperPhone: map['shipperPhone'] as String?,
+      bidStatus: map['bidStatus'] as String? ?? 'available',
     );
   }
 
@@ -68,4 +72,22 @@ class OrderModel {
   // TỪ JSON STRING → OrderModel
   factory OrderModel.fromJson(String source) =>
       OrderModel.fromMap(jsonDecode(source) as Map<String, dynamic>);
+
+  // COPY WITH METHOD ĐỂ THAY ĐỔI TRẠNG THÁI
+  OrderModel copyWith({String? bidStatus}) {
+    return OrderModel(
+      id: id,
+      from: from,
+      to: to,
+      fromDetail: fromDetail,
+      toDetail: toDetail,
+      weight: weight,
+      price: price,
+      receiveDate: receiveDate,
+      deliverDate: deliverDate,
+      shipperName: shipperName,
+      shipperPhone: shipperPhone,
+      bidStatus: bidStatus ?? this.bidStatus,
+    );
+  }
 }

@@ -133,6 +133,25 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                   child: CustomButton(
                     label: 'Gửi giá đấu thầu',
                     onPressed: () async {
+                      // Kiểm tra xem đã gửi giá cho đơn này chưa
+                      final waitingOrders = await OrderStatusService.getWaitingOrders();
+                      final acceptedOrders = await OrderStatusService.getAcceptedOrders();
+                      
+                      final alreadyBid = waitingOrders.any((o) => o.id == widget.order.id) ||
+                                        acceptedOrders.any((o) => o.id == widget.order.id);
+                      
+                      if (alreadyBid) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('⚠️ Bạn đã gửi giá đấu thầu cho đơn này rồi!'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
+
                       // Lưu đơn vào trạng thái "Đang chờ"
                       await OrderStatusService.addWaitingOrder(widget.order);
 
@@ -142,31 +161,13 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                       // Hiển thị notification
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Đã gửi giá đấu thầu! Bạn sẽ nhận thông báo khi có cập nhật'),
+                          content: Text('Đã gửi giá đấu thầu! Chờ chủ hàng phản hồi...'),
                           backgroundColor: Colors.blue,
                           duration: Duration(seconds: 2),
                         ),
                       );
 
                       widget.onBidSubmitted?.call();
-
-                      // Giả lập: 70% trúng thầu (sau 3 giây)
-                      Future.delayed(const Duration(seconds: 3), () {
-                        if (DateTime.now().millisecond % 10 < 7) {
-                          // Chuyển từ waiting sang accepted
-                          OrderStatusService.acceptOrder(widget.order.id);
-                          widget.onBidAccepted?.call();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('🎉 Chúc mừng! Bạn đã trúng thầu!'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          }
-                        }
-                      });
                     },
                   ),
                 ),

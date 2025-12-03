@@ -1,6 +1,5 @@
 // lib/features/driver/screens/driver_orders_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 import '../models/order_model.dart';
@@ -15,17 +14,13 @@ class DriverOrdersScreen extends StatefulWidget {
 }
 
 class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
-  List<OrderModel> orders = [];
-  Set<String> biddingOrders = {};
-  List<OrderModel> waitingOrders = [];
-  List<OrderModel> acceptedOrders = [];
+  List<OrderModel> allOrders = [];
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadAllData();
-    // Reload dữ liệu mỗi 2 giây để kiểm tra xem chủ hàng có chấp nhận bid hay không
     _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       _loadAllData();
     });
@@ -38,38 +33,128 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
   }
 
   Future<void> _loadAllData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final biddingIds = prefs.getStringList('bidding_orders') ?? [];
+    // 1. Load available orders từ DriverService
+    final availableOrders = await DriverService().getAvailableOrders();
 
-    // Load từ OrderStatusService (chứa waiting_orders và accepted_orders)
-    final waitingOrdersList = await OrderStatusService.getWaitingOrders();
-    final acceptedOrdersList = await OrderStatusService.getAcceptedOrders();
+    // 2. Load stored driver orders (với bidStatus)
+    final storedOrders = await OrderStatusService.getAllOrders();
 
-    // Load available orders từ DriverService
-    final data = await DriverService().getAvailableOrders();
+    // 3. Merge: Thay thế available orders bằng stored nếu tồn tại, giữ lại các orders khác
+    final mergedOrders = <OrderModel>[];
+
+    // Thêm stored orders trước (với bidStatus khác 'available')
+    for (final stored in storedOrders) {
+      mergedOrders.add(stored);
+    }
+
+    // Thêm available orders (chỉ những cái chưa bid)
+    for (final available in availableOrders) {
+      if (!storedOrders.any((s) => s.id == available.id)) {
+        mergedOrders.add(available.copyWith(bidStatus: 'available'));
+      }
+    }
 
     setState(() {
-      orders = data;
-      biddingOrders = biddingIds.toSet();
-      waitingOrders = waitingOrdersList;
-      acceptedOrders = acceptedOrdersList;
+      allOrders = mergedOrders;
     });
 
-    debugPrint('DriverOrdersScreen - Available: ${orders.length}, Waiting: ${waitingOrders.length}, Accepted: ${acceptedOrders.length}');
+    debugPrint('DriverOrdersScreen - Total orders: ${allOrders.length}');
+    for (final o in allOrders) {
+      debugPrint('  - ${o.id}: ${o.bidStatus}');
+    }
+  }
+
+  void _handleOrderTap(OrderModel order) {
+    if (order.bidStatus == 'available') {
+      // Hiển thị BidBottomSheet
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => BidBottomSheet(
+          order: order,
+          onBidSubmitted: () async {
+            await _loadAllData();
+          },
+        ),
+      );
+    } else if (order.bidStatus == 'waiting') {
+      // Hiển thị chi tiết đơn hàng
+      _showOrderDetails(order);
+    } else if (order.bidStatus == 'accepted') {
+      // Hiển thị thông báo và chuyển sang history
+      _showAcceptedNotification(order);
+    }
+  }
+
+  void _showOrderDetails(OrderModel order) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Chi tiết đơn hàng'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _detailRow('Mã chuyến:', order.id),
+              _detailRow('Tuyến:', '${order.from} → ${order.to}'),
+              _detailRow('Chi tiết từ:', order.fromDetail),
+              _detailRow('Chi tiết đến:', order.toDetail),
+              _detailRow('Khối lượng:', order.weight),
+              _detailRow('Giá đề xuất:', order.price),
+              _detailRow('Ngày nhận:', order.receiveDate),
+              _detailRow('Ngày giao:', order.deliverDate),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Đơn hàng đang chờ phản hồi từ chủ hàng...',
+                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.orange),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAcceptedNotification(OrderModel order) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🎉 Chúc mừng!'),
+        content: const Text(
+          'Đơn hàng này đã được chủ hàng xác nhận.\nĐơn hàng sẽ được chuyển vào mục "Lịch sử" với trạng thái "Đang vận chuyển".',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Chuyển accepted -> completed (Đang vận chuyển)
+              await OrderStatusService.completeOrder(order.id);
+              if (mounted) {
+                Navigator.pop(context);
+                await _loadAllData();
+              }
+            },
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Combine available, waiting và accepted orders
-    // Available orders = chưa đặt giá
-    // Waiting orders = đang chờ phản hồi (đã đặt giá, chưa chấp nhận)
-    // Accepted orders = đã chấp nhận (trúng thầu)
-    
-    final allOrders = <OrderModel>[
-      ...orders, // Available orders
-      ...waitingOrders, // Waiting orders (đang chờ phản hồi)
-      ...acceptedOrders, // Accepted orders (trúng thầu)
-    ];
+    final availableCount = allOrders.where((o) => o.bidStatus == 'available').length;
+    final waitingCount = allOrders.where((o) => o.bidStatus == 'waiting').length;
+    final acceptedCount = allOrders.where((o) => o.bidStatus == 'accepted').length;
 
     return Column(
       children: [
@@ -87,7 +172,7 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    'Khả dụng: ${orders.length} • Chờ phản hồi: ${waitingOrders.length} • Chấp nhận: ${acceptedOrders.length}',
+                    'Khả dụng: $availableCount • Chờ phản hồi: $waitingCount • Chấp nhận: $acceptedCount',
                     style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                   ),
                 ),
@@ -111,22 +196,23 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
                     itemCount: allOrders.length,
                     itemBuilder: (context, index) {
                       final order = allOrders[index];
-                      final isWaiting = waitingOrders.contains(order);
-                      final isAccepted = acceptedOrders.contains(order);
 
-                      // Xác định status
-                      String status = 'Khả dụng';
+                      // Xác định status UI
+                      String statusText = 'Khả dụng';
                       Color statusBgColor = Colors.blue[100]!;
                       Color statusTextColor = Colors.blue[800]!;
+                      String icon = '?';
 
-                      if (isWaiting) {
-                        status = 'Đang chờ phản hồi';
+                      if (order.bidStatus == 'waiting') {
+                        statusText = 'Đang chờ phản hồi';
                         statusBgColor = Colors.orange[100]!;
                         statusTextColor = Colors.orange[800]!;
-                      } else if (isAccepted) {
-                        status = 'Đã chấp nhận';
+                        icon = '⏳';
+                      } else if (order.bidStatus == 'accepted') {
+                        statusText = 'Đã chấp nhận';
                         statusBgColor = Colors.green[100]!;
                         statusTextColor = Colors.green[800]!;
+                        icon = '✓';
                       }
 
                       return Padding(
@@ -136,12 +222,11 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
                             leading: CircleAvatar(
                               backgroundColor: statusBgColor,
                               child: Text(
-                                isAccepted
-                                    ? '✓'
-                                    : isWaiting
-                                        ? '⏳'
-                                        : '?',
-                                style: TextStyle(color: statusTextColor, fontWeight: FontWeight.bold),
+                                icon,
+                                style: TextStyle(
+                                  color: statusTextColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             title: Text(
@@ -152,28 +237,15 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
                             trailing: Chip(
                               backgroundColor: statusBgColor,
                               label: Text(
-                                status,
-                                style: TextStyle(color: statusTextColor, fontWeight: FontWeight.bold, fontSize: 11),
+                                statusText,
+                                style: TextStyle(
+                                  color: statusTextColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
                               ),
                             ),
-                            onTap: isAccepted
-                                ? null
-                                : () {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      isScrollControlled: true,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (_) => BidBottomSheet(
-                                        order: order,
-                                        onBidSubmitted: () async {
-                                          await _loadAllData();
-                                        },
-                                        onBidAccepted: () async {
-                                          await _loadAllData();
-                                        },
-                                      ),
-                                    );
-                                  },
+                            onTap: () => _handleOrderTap(order),
                           ),
                         ),
                       );
@@ -184,4 +256,15 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
       ],
     );
   }
+
+  Widget _detailRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(width: 8),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
 }
