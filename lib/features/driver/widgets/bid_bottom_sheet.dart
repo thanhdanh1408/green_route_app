@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../models/order_model.dart';
-import 'bid_pending_dialog.dart';
 import '../services/order_status_service.dart';
 
 class BidBottomSheet extends StatefulWidget {
@@ -65,7 +64,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
             const SizedBox(height: 16),
 
             const Text('Giá chủ hàng đề xuất', style: TextStyle(fontWeight: FontWeight.w600)),
-            Text('3.500.000 đ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
+            Text(widget.order.price, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 16),
 
             const Text('Chọn giá đấu thầu của bạn', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -122,21 +121,33 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
 
                       if (!mounted) return;
                       Navigator.pop(context);
-                      showDialog(context: context, builder: (_) => const BidPendingDialog());
 
-                      Future.delayed(const Duration(seconds: 2), () {
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        widget.onBidSubmitted?.call();
+                      // Hiển thị notification
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã gửi giá đấu thầu! Bạn sẽ nhận thông báo khi có cập nhật'),
+                          backgroundColor: Colors.blue,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
 
-                        // Giả lập: 70% trúng thầu
+                      widget.onBidSubmitted?.call();
+
+                      // Giả lập: 70% trúng thầu (sau 3 giây)
+                      Future.delayed(const Duration(seconds: 3), () {
                         if (DateTime.now().millisecond % 10 < 7) {
                           // Chuyển từ waiting sang accepted
                           OrderStatusService.acceptOrder(widget.order.id);
                           widget.onBidAccepted?.call();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Chúc mừng! Bạn đã trúng thầu!'), backgroundColor: Colors.green),
-                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('🎉 Chúc mừng! Bạn đã trúng thầu!'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
                         }
                       });
                     },
