@@ -126,10 +126,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           final identifier = _identifierController.text.trim();
                           final password = _passwordController.text;
 
+                          debugPrint('=== LOGIN DEBUG ===');
+                          debugPrint('Identifier: $identifier');
+                          debugPrint('Password: $password');
+                          debugPrint('FakeUsers keys: ${AuthService.instance.fakeUsers.keys.toList()}');
+                          
                           final user = await AuthService.instance.login(
                             identifier,
                             password,
                           );
+                          
+                          debugPrint('Login result: $user');
                           setState(() => _isLoading = false);
 
                           if (user != null && mounted) {
