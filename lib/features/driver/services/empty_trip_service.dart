@@ -39,17 +39,13 @@ class EmptyTripService {
       status: 'open',
     );
 
-    // Lưu vào danh sách chuyến chung
-    final allTrips = prefs.getStringList(_emptyTripsKey) ?? [];
-    allTrips.add(trip.toJson());
-    await prefs.setStringList(_emptyTripsKey, allTrips);
-
-    // Lưu vào danh sách chuyến của driver
-    final myTrips = prefs.getStringList(_myTripsKey) ?? [];
-    myTrips.add(trip.toJson());
-    await prefs.setStringList(_myTripsKey, myTrips);
+    // Lưu vào danh sách chuyến chung (lưu dưới dạng JSON string)
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    allTripsJson.add(trip.toJson());
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
 
     debugPrint('✅ Created empty trip: ${trip.id}');
+    debugPrint('📌 Total trips in storage: ${allTripsJson.length}');
     return trip;
   }
 
@@ -58,11 +54,27 @@ class EmptyTripService {
     final prefs = await SharedPreferences.getInstance();
     final tripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
 
+    debugPrint('🔍 getAvailableEmptyTrips: Found ${tripsJson.length} total trips in storage');
+
     final trips = tripsJson
-        .map((e) => EmptyTrip.fromJson(e))
-        .where((t) => t.status == 'open' && t.hasAvailableSlots)
+        .map((e) {
+          try {
+            return EmptyTrip.fromJson(e);
+          } catch (err) {
+            debugPrint('❌ Error parsing trip: $err');
+            return null;
+          }
+        })
+        .whereType<EmptyTrip>()
+        .where((t) {
+          final isOpen = t.status == 'open';
+          final hasSlots = t.hasAvailableSlots;
+          debugPrint('   Trip ${t.id}: status=${t.status}, hasSlots=$hasSlots, joined=${t.joinedShippers.length}/${t.maxShippers}');
+          return isOpen && hasSlots;
+        })
         .toList();
 
+    debugPrint('✅ Available trips: ${trips.length}');
     return trips;
   }
 
@@ -200,5 +212,24 @@ class EmptyTripService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_emptyTripsKey);
     await prefs.remove(_myTripsKey);
+  }
+
+  // ========== DIAGNOSTIC: CHECK STORAGE ==========
+  static Future<void> debugPrintStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    
+    debugPrint('📊 === STORAGE DIAGNOSTIC ===');
+    debugPrint('Total trips stored: ${allTripsJson.length}');
+    
+    for (int i = 0; i < allTripsJson.length; i++) {
+      try {
+        final trip = EmptyTrip.fromJson(allTripsJson[i]);
+        debugPrint('  Trip $i: id=${trip.id}, from=${trip.from}→${trip.to}, status=${trip.status}, joined=${trip.joinedShippers.length}/${trip.maxShippers}');
+      } catch (e) {
+        debugPrint('  ❌ Trip $i: PARSE ERROR - $e');
+      }
+    }
+    debugPrint('========================');
   }
 }

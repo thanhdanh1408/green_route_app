@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import 'driver_route_selection_screen.dart';
 import 'driver_orders_screen.dart';
 import 'available_orders_screen.dart';
+import 'create_empty_trip_screen.dart';
 import 'wallet_screen.dart';
 import 'settings_screen.dart';
 
@@ -73,13 +74,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ? FloatingActionButton(
               backgroundColor: AppColors.primary,
               onPressed: () {
-                // Kéo xuống làm mới danh sách đơn
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đang làm mới danh sách đơn...')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateEmptyTripScreen()),
                 );
-                setState(() {}); // Tạm thời – sau này dùng Stream/Firebase
               },
-              child: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Tạo chuyến ghép hàng',
+              child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
 

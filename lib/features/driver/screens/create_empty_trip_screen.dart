@@ -271,6 +271,7 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                   onPressed: () async {
                     if (_formKey.currentState!.validate() && _pickupTime != null && _deliveryTime != null) {
                       // TODO: Get current driver info from AuthService
+                      debugPrint('🚀 Creating empty trip...');
                       final trip = await EmptyTripService.createEmptyTrip(
                         driverId: '0987654321',
                         driverName: 'Tài xế Nguyễn Văn Nam',
@@ -285,11 +286,17 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                         maxShippers: int.parse(_maxShippers!),
                       );
 
+                      debugPrint('✅ Trip created: ${trip.id}');
+                      
+                      // Verify storage
+                      await EmptyTripService.debugPrintStorage();
+
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('✅ Tạo chuyến thành công! ID: ${trip.id}'),
                           backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 2),
                         ),
                       );
 

@@ -22,8 +22,10 @@ class _MatchCargoScreenState extends State<MatchCargoScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🚀 MatchCargoScreen initState - loading trips');
     _loadTrips();
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      debugPrint('⏱️ Auto-refresh timer fired - reloading trips');
       _loadTrips();
     });
   }
@@ -35,7 +37,10 @@ class _MatchCargoScreenState extends State<MatchCargoScreen> {
   }
 
   Future<void> _loadTrips() async {
+    debugPrint('🔄 Loading available trips from MatchCargoScreen...');
+    await EmptyTripService.debugPrintStorage();
     final trips = await EmptyTripService.getAvailableEmptyTrips();
+    debugPrint('📍 MatchCargoScreen received ${trips.length} trips');
     setState(() {
       availableTrips = trips;
       _isLoading = false;
