@@ -31,6 +31,17 @@ class AuthService {
       'accountName': 'TRAN THI LAN',
       'idStatus': 'approved',
     },
+    '0981521407': {
+      'password': '12345678',
+      'role': 'shipper',
+      'hasRole': true,
+      'name': 'Chủ hàng Phan Thành Danh',
+      'address': 'Quy Nhơn',
+      'bank': 'Vietcombank',
+      'accountNumber': '0011001934567',
+      'accountName': 'PHAN THANH DANH',
+      'idStatus': 'approved',
+    },
     '0901234567': {
       'password': '12345678',
       'role': null,

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../driver/models/empty_trip_model.dart';
@@ -289,14 +290,19 @@ class _MatchCargoScreenState extends State<MatchCargoScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              // ✅ Lấy thông tin shipper hiện tại từ SharedPreferences
+              final prefs = await SharedPreferences.getInstance();
+              final shipperId = prefs.getString('user_phone') ?? '0977123456';
+              final shipperName = prefs.getString('name') ?? 'Chủ hàng';
+
               final success = await EmptyTripService.joinEmptyTrip(
                 tripId: trip.id,
-                shipperId: '0977123456', // TODO: Get from AuthService
-                shipperName: 'Chủ hàng Trần Thị Lan',
-                shipperPhone: '0977123456',
-                cargoType: cargoTypeController.text,
-                cargoWeight: cargoWeightController.text,
-                price: priceController.text,
+                shipperId: shipperId,
+                shipperName: shipperName,
+                shipperPhone: shipperId,
+                cargoType: cargoTypeController.text.trim(),
+                cargoWeight: cargoWeightController.text.trim(),
+                price: priceController.text.trim(),
               );
 
               if (!mounted) return;
