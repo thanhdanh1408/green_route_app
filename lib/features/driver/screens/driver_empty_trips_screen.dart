@@ -37,12 +37,9 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> {
   }
 
   Future<void> _loadMyTrips() async {
-    // Lấy tất cả chuyến, sau đó lọc chỉ chuyến của driver hiện tại
-    final allTrips = await EmptyTripService.getAvailableEmptyTrips();
-    final driverId = '0987654321'; // TODO: Get from AuthService
-
-    // Lọc chỉ chuyến của driver hiện tại
-    final trips = allTrips.where((t) => t.driverId == driverId).toList();
+    // Lấy tất cả chuyến của driver hiện tại
+    const driverId = '0987654321'; // TODO: Get from AuthService
+    final trips = await EmptyTripService.getMyEmptyTrips(driverId);
 
     debugPrint('📍 DriverEmptyTripsScreen loaded ${trips.length} my trips');
     setState(() {

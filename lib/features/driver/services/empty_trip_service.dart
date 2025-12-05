@@ -147,13 +147,21 @@ class EmptyTripService {
   // ========== DRIVER: LẤY DANH SÁCH CHUYẾN CỦA TÔI ==========
   static Future<List<EmptyTrip>> getMyEmptyTrips(String driverId) async {
     final prefs = await SharedPreferences.getInstance();
-    final myTripsJson = prefs.getStringList(_myTripsKey) ?? [];
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
 
-    final trips = myTripsJson
-        .map((e) => EmptyTrip.fromJson(e))
-        .where((t) => t.driverId == driverId)
-        .toList();
+    final trips = <EmptyTrip>[];
+    for (var i = 0; i < allTripsJson.length; i++) {
+      try {
+        final trip = EmptyTrip.fromJson(allTripsJson[i]);
+        if (trip.driverId == driverId) {
+          trips.add(trip);
+        }
+      } catch (err) {
+        debugPrint('❌ Error parsing trip at index $i: $err');
+      }
+    }
 
+    debugPrint('🔍 getMyEmptyTrips: Found ${trips.length} trips for driver $driverId');
     return trips;
   }
 
