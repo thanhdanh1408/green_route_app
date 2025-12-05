@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import 'driver_route_selection_screen.dart';
 import 'driver_orders_screen.dart';
-import 'available_orders_screen.dart';
+import 'driver_empty_trips_screen.dart';
 import 'create_empty_trip_screen.dart';
 import 'wallet_screen.dart';
 import 'settings_screen.dart';
@@ -43,8 +43,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     // Tab 0: Đơn hàng (nếu đã chọn tuyến) hoặc Chọn tuyến
     _hasRoute ? const DriverOrdersScreen() : const DriverRouteSelectionScreen(),
 
-    // Tab 1: Ghép hàng → HIỆN TẤT CẢ ĐƠN TỪ CHỦ HÀNG (TÌM TÀI XẾ + GHÉP HÀNG)
-    const DriverAvailableOrdersScreen(),   // ← ĐÂY LÀ MÀN HÌNH MỚI CHỈ CẦN DÁN
+    // Tab 1: Ghép hàng → CHUYẾN CỦA TÀI XẾ
+    const DriverEmptyTripsScreen(),
 
     // Tab 2: Lịch sử
     const HistoryScreen(),
