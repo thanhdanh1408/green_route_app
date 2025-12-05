@@ -1,194 +1,433 @@
 // lib/features/shipper/screens/match_cargo_screen.dart
 import 'package:flutter/material.dart';
-import 'package:green_route_app/core/services/order_pool_service.dart';
+import 'dart:async';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/custom_button.dart';
+import '../../driver/models/empty_trip_model.dart';
+import '../../driver/services/empty_trip_service.dart';
 
-class MatchCargoScreen extends StatelessWidget {
+class MatchCargoScreen extends StatefulWidget {
   const MatchCargoScreen({super.key});
+
+  @override
+  State<MatchCargoScreen> createState() => _MatchCargoScreenState();
+}
+
+class _MatchCargoScreenState extends State<MatchCargoScreen> {
+  List<EmptyTrip> availableTrips = [];
+  Timer? _refreshTimer;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrips();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _loadTrips();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadTrips() async {
+    final trips = await EmptyTripService.getAvailableEmptyTrips();
+    setState(() {
+      availableTrips = trips;
+      _isLoading = false;
+    });
+  }
+
+  void _showTripDetails(EmptyTrip trip) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Chi tiết chuyến ghép hàng',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(),
+              const SizedBox(height: 12),
+
+              // Thông tin driver
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('👤 Thông tin tài xế', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _detailRow('Tên:', trip.driverName),
+                    _detailRow('SĐT:', trip.driverPhone),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Thông tin chuyến
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('📍 Thông tin chuyến', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    _detailRow('Tuyến:', '${trip.from} → ${trip.to}'),
+                    _detailRow('Container:', trip.containerType),
+                    _detailRow('Dung tích:', trip.capacity),
+                    _detailRow('Giá chuyến:', '${trip.proposedPrice}đ'),
+                    _detailRow('Nhận hàng:', DateFormat('dd/MM HH:mm').format(trip.pickupTime)),
+                    _detailRow('Giao hàng:', DateFormat('dd/MM HH:mm').format(trip.deliveryTime)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Shipper đã join
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('👥 Chủ hàng đã tham gia', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Chip(
+                          label: Text('${trip.joinedShippers.length}/${trip.maxShippers}'),
+                          backgroundColor: trip.hasAvailableSlots ? Colors.orange[200] : Colors.red[200],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (trip.joinedShippers.isEmpty)
+                      const Text('Chưa có chủ hàng nào tham gia', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic))
+                    else
+                      Column(
+                        children: trip.joinedShippers.map((shipper) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      shipper.shipperName[0],
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(shipper.shipperName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      Text(
+                                        '${shipper.cargoWeight} - ${shipper.cargoType}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '${shipper.price}đ',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Progress bar
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Lạp đầy chuyến', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('${trip.fillPercentage}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: trip.fillPercentage / 100,
+                      minHeight: 8,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        trip.hasAvailableSlots ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Nút tham gia
+              if (trip.hasAvailableSlots)
+                SizedBox(
+                  width: double.infinity,
+                  child: CustomButton(
+                    label: 'Tham gia ghép hàng',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _showJoinDialog(trip);
+                    },
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: null,
+                    child: const Text('Chuyến đã đầy'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showJoinDialog(EmptyTrip trip) {
+    final cargoTypeController = TextEditingController();
+    final cargoWeightController = TextEditingController();
+    final priceController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tham gia ghép hàng'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: cargoTypeController,
+                decoration: InputDecoration(
+                  labelText: 'Loại hàng',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: cargoWeightController,
+                decoration: InputDecoration(
+                  labelText: 'Khối lượng (tấn)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: priceController,
+                decoration: InputDecoration(
+                  labelText: 'Giá (VNĐ)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final success = await EmptyTripService.joinEmptyTrip(
+                tripId: trip.id,
+                shipperId: '0977123456', // TODO: Get from AuthService
+                shipperName: 'Chủ hàng Trần Thị Lan',
+                shipperPhone: '0977123456',
+                cargoType: cargoTypeController.text,
+                cargoWeight: cargoWeightController.text,
+                price: priceController.text,
+              );
+
+              if (!mounted) return;
+              Navigator.pop(context);
+
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Tham gia ghép hàng thành công!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                await _loadTrips();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('❌ Không thể tham gia chuyến này'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Tham gia'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ghép hàng'),
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        title: const Text('Ghép hàng tiết kiệm', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          MatchCargoItemCard(),
-          SizedBox(height: 16),
-          // Có thể thêm nhiều card khác ở đây sau
-        ],
-      ),
-    );
-  }
-}
-
-// CARD RIÊNG – DỄ DÙNG LẠI, ĐẸP CHUẨN ẢNH
-class MatchCargoItemCard extends StatelessWidget {
-  const MatchCargoItemCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 6,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Tiêu đề + icon
-            Row(
-              children: [
-                Icon(Icons.sync_alt, color: AppColors.primary, size: 28),
-                const SizedBox(width: 8),
-                const Text(
-                  'Ghép hàng tiết kiệm',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Nhiều chủ hàng cùng thuê 1 xe – Chia sẻ chi phí',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const Divider(height: 32),
-
-            // Mã chuyến + tuyến đường
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'GF034',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Đắk Lắk → Quy Nhơn',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const Icon(Icons.person, color: Colors.grey),
-                const Text('2 chủ hàng', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Thông tin tài xế
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.primary,
-                  child: const Text(
-                    'N',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : availableTrips.isEmpty
+              ? Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Tài xế: Nguyễn Văn A',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Icon(Icons.local_shipping, size: 64, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Hiện không có chuyến ghép hàng',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
                       ),
-                      const Text('Xe tải trung [71A-12345]'),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            const Text('Khởi hành: 12-11-2025'),
-            const Text('Tổng trọng: 3.2 / 5.0 tấn'),
-            const SizedBox(height: 8),
-
-            // Thanh tiến độ
-            LinearProgressIndicator(
-              value: 3.2 / 5.0,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 20),
-
-            // Nút tham gia
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadTrips,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: availableTrips.length,
+                    itemBuilder: (context, index) {
+                      final trip = availableTrips[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: InkWell(
+                          onTap: () => _showTripDetails(trip),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${trip.from} → ${trip.to}',
+                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          Text(
+                                            '${trip.containerType} • ${trip.capacity}',
+                                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Chip(
+                                      label: Text('${trip.joinedShippers.length}/${trip.maxShippers}'),
+                                      backgroundColor: trip.hasAvailableSlots ? Colors.orange[100] : Colors.red[100],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: trip.fillPercentage / 100,
+                                    minHeight: 6,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Giá chuyến: ${trip.proposedPrice}đ',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                                    ),
+                                    Text(
+                                      'Tài xế: ${trip.driverName}',
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  elevation: 4,
                 ),
-                // Trong MatchCargoItemCard → onPressed của nút
-                onPressed: () {
-                  OrderPoolService.instance.addOrder(
-                    type: OrderType.matching,
-                    from: 'Đắk Lắk',
-                    to: 'Quy Nhơn',
-                    goods: 'Hàng nông sản',
-                    weight: '1.8',
-                    price: '2.200.000',
-                    pickup: '12-11-2025 08:00',
-                    deliver: '13-11-2025 18:00',
-                    shipperName: 'Chủ hàng Trần Lan',
-                  );
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Đã đăng yêu cầu ghép hàng! Tài xế đang xem...',
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                child: const Text(
-                  'Tham gia ghép hàng',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
+
+  Widget _detailRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
 }
