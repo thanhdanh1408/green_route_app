@@ -19,7 +19,7 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
 
   static final List<Widget> _pages = [
     FindDriverScreen(),     // ← Ở đây sẽ có danh sách tài xế có sẵn
-    const MatchCargoScreen(),
+    MatchCargoScreen(),     // ✅ Xóa const để cho phép rebuild
     MyOrdersScreen(),
     const HistoryScreen(),
     const SettingsScreen(),

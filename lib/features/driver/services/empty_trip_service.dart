@@ -56,25 +56,24 @@ class EmptyTripService {
 
     debugPrint('🔍 getAvailableEmptyTrips: Found ${tripsJson.length} total trips in storage');
 
-    final trips = tripsJson
-        .map((e) {
-          try {
-            return EmptyTrip.fromJson(e);
-          } catch (err) {
-            debugPrint('❌ Error parsing trip: $err');
-            return null;
-          }
-        })
-        .whereType<EmptyTrip>()
-        .where((t) {
-          final isOpen = t.status == 'open';
-          final hasSlots = t.hasAvailableSlots;
-          debugPrint('   Trip ${t.id}: status=${t.status}, hasSlots=$hasSlots, joined=${t.joinedShippers.length}/${t.maxShippers}');
-          return isOpen && hasSlots;
-        })
-        .toList();
+    final trips = <EmptyTrip>[];
+    
+    for (var i = 0; i < tripsJson.length; i++) {
+      try {
+        final trip = EmptyTrip.fromJson(tripsJson[i]);
+        final isOpen = trip.status == 'open';
+        final hasSlots = trip.hasAvailableSlots;
+        debugPrint('   Trip $i: id=${trip.id}, from=${trip.from}→${trip.to}, status=${trip.status}, hasSlots=$hasSlots, joined=${trip.joinedShippers.length}/${trip.maxShippers}');
+        
+        if (isOpen && hasSlots) {
+          trips.add(trip);
+        }
+      } catch (err) {
+        debugPrint('❌ Error parsing trip at index $i: $err');
+      }
+    }
 
-    debugPrint('✅ Available trips: ${trips.length}');
+    debugPrint('✅ Available trips found: ${trips.length}');
     return trips;
   }
 
