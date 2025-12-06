@@ -37,16 +37,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _nameCtrl = TextEditingController(text: prefs.getString('name') ?? 'Nguyễn Văn A');
-      _phoneCtrl = TextEditingController(text: prefs.getString('phone') ?? '0987654321');
-      _idCtrl = TextEditingController(text: prefs.getString('id') ?? '0123456789');
-      _plateCtrl = TextEditingController(text: prefs.getString('plate') ?? '77A-8977');
-      _vehicleTypeCtrl = TextEditingController(text: prefs.getString('vehicle_type') ?? 'Xe tải nặng');
-      _capacityCtrl = TextEditingController(text: prefs.getString('capacity') ?? '5 tấn');
-      _areaCtrl = TextEditingController(text: prefs.getString('area') ?? 'Gia Lai');
-      _bankCtrl = TextEditingController(text: prefs.getString('bank') ?? 'Techcombank');
-      _accountCtrl = TextEditingController(text: prefs.getString('account') ?? '0965xxxxx');
-      _accountNameCtrl = TextEditingController(text: prefs.getString('account_name') ?? 'Nguyễn Văn A');
+      _nameCtrl = TextEditingController(text: prefs.getString('name') ?? '');
+      _phoneCtrl = TextEditingController(text: prefs.getString('user_phone') ?? '');
+      _idCtrl = TextEditingController(text: prefs.getString('id') ?? '');
+      _plateCtrl = TextEditingController(text: prefs.getString('plate') ?? '');
+      _vehicleTypeCtrl = TextEditingController(text: prefs.getString('vehicle_type') ?? '');
+      _capacityCtrl = TextEditingController(text: prefs.getString('capacity') ?? '');
+      _areaCtrl = TextEditingController(text: prefs.getString('area') ?? '');
+      _bankCtrl = TextEditingController(text: prefs.getString('bank') ?? '');
+      _accountCtrl = TextEditingController(text: prefs.getString('account') ?? '');
+      _accountNameCtrl = TextEditingController(text: prefs.getString('account_name') ?? '');
     });
   }
 
@@ -56,7 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('name', _nameCtrl.text);
-    await prefs.setString('phone', _phoneCtrl.text);
+    await prefs.setString('user_phone', _phoneCtrl.text);
     await prefs.setString('id', _idCtrl.text);
     await prefs.setString('plate', _plateCtrl.text);
     await prefs.setString('vehicle_type', _vehicleTypeCtrl.text);
@@ -66,9 +66,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setString('account', _accountCtrl.text);
     await prefs.setString('account_name', _accountNameCtrl.text);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã lưu thông tin thành công!'), backgroundColor: Colors.green),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu thông tin thành công!'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   @override
@@ -139,7 +141,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ElevatedButton.icon(
                 onPressed: () async {
                   await AuthService.instance.logout();
-                  Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                  if (mounted) {
+                    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                  }
                 },
                 icon: const Icon(Icons.logout, color: Colors.white),
                 label: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),

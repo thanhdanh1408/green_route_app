@@ -1,0 +1,370 @@
+📱 HƯỚNG DẪN CHI TIẾT: SETUP FIREBASE REALTIME DATABASE CHO GREEN ROUTE APP
+
+=============================================================================
+BƯỚC 1: THÊM FIREBASE PACKAGES VÀO PUBSPEC.YAML
+=============================================================================
+
+Chạy lệnh này trong terminal ở thư mục c:\Flutter\green_route_app:
+
+    flutter pub add firebase_core
+    flutter pub add firebase_database
+
+Hoặc thêm manual vào pubspec.yaml (dưới dependencies):
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Existing packages...
+  shared_preferences: ^2.0.0
+  
+  # Thêm firebase packages
+  firebase_core: ^2.24.0
+  firebase_database: ^10.2.0
+
+Sau đó chạy: flutter pub get
+
+=============================================================================
+BƯỚC 2: SETUP FIREBASE PROJECT TRÊN CONSOLE
+=============================================================================
+
+2.1. Truy cập: https://console.firebase.google.com
+2.2. Click "Tạo dự án"
+2.3. Nhập tên: "green_route_app"
+2.4. Skip Google Analytics
+2.5. Click "Tạo dự án" và chờ
+
+=============================================================================
+BƯỚC 3: THÊM ANDROID APP VÀO FIREBASE
+=============================================================================
+
+3.1. Vào Project Settings (bánh răng góc trên)
+3.2. Tab "Ứng dụng và dịch vụ"
+3.3. Click "Thêm ứng dụng" > Chọn Android
+3.4. Điền thông tin:
+     - Tên gói Android: com.example.green_route_app
+     - Biệt danh: Green Route App (optional)
+3.5. Click "Đăng ký ứng dụng"
+3.6. DOWNLOAD google-services.json
+3.7. COPY file vào: android/app/google-services.json
+
+3.8. Tiếp đến Firebase sẽ hướng dẫn add gradle dependencies
+
+=============================================================================
+BƯỚC 4: SETUP ANDROID BUILD FILES
+=============================================================================
+
+File: android/build.gradle (file ở root android folder)
+
+Tìm section "buildscript {" và trong "dependencies {" thêm:
+
+    classpath 'com.google.gms:google-services:4.3.15'
+
+Ví dụ:
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+
+        dependencies {
+            classpath 'com.android.tools.build:gradle:7.3.0'
+            classpath 'com.google.gms:google-services:4.3.15'  // ← Thêm dòng này
+            classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.10'
+        }
+    }
+
+File: android/app/build.gradle
+
+Tìm cuối file (sau dòng cuối cùng của dependencies) và thêm:
+
+    apply plugin: 'com.google.gms.google-services'
+
+Ví dụ cuối file:
+    dependencies {
+        // existing dependencies...
+    }
+
+    apply plugin: 'com.google.gms.google-services'  // ← Thêm dòng này
+
+
+=============================================================================
+BƯỚC 5: SETUP WEB (Nếu muốn dùng Web)
+=============================================================================
+
+5.1. Firebase Console > Project Settings > Ứng dụng
+5.2. Click "Thêm ứng dụng" > Chọn Web (</>)
+5.3. Tên: "green_route_app-web"
+5.4. Copy Firebase config:
+
+    const firebaseConfig = {
+      apiKey: "...",
+      authDomain: "...",
+      databaseURL: "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "...",
+      storageBucket: "...",
+      messagingSenderId: "...",
+      appId: "..."
+    };
+
+5.5. File: web/index.html
+
+Tìm </head> và thêm trước nó:
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+
+Tìm </body> và thêm trước nó:
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "your-project.firebaseapp.com",
+        databaseURL: "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "your-project",
+        storageBucket: "your-project.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+    </script>
+
+=============================================================================
+BƯỚC 6: TẠO REALTIME DATABASE
+=============================================================================
+
+6.1. Firebase Console > "Realtime Database" (ở sidebar trái)
+6.2. Click "Tạo cơ sở dữ liệu"
+6.3. Chọn vị trí: "asia-southeast1" (Singapore) - tốt cho Việt Nam
+6.4. Chế độ: "Bắt đầu ở chế độ kiểm tra"
+6.5. Click "Bật"
+
+6.6. Vào tab "Rules" và paste:
+
+{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}
+
+⚠️ LƯU Ý: Chế độ này cho phép mọi người read/write. CHỈ dùng để test!
+           Trong production cần setup auth rules an toàn hơn.
+
+Click "Publish" để lưu rules.
+
+=============================================================================
+BƯỚC 7: UPDATE main.dart
+=============================================================================
+
+File: lib/main.dart
+
+Thêm import ở đầu file:
+
+    import 'package:firebase_core/firebase_core.dart';
+    import 'firebase_options.dart';
+
+Update hàm main():
+
+    void main() async {
+      WidgetsFlutterBinding.ensureInitialized();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      runApp(const MyApp());
+    }
+
+Nó sẽ yêu cầu cài Firebase CLI để generate firebase_options.dart:
+
+    npm install -g firebase-tools
+    firebase login
+    dart pub global activate flutterfire_cli
+    flutterfire configure
+
+=============================================================================
+BƯỚC 8: TEST CONNECTION
+=============================================================================
+
+Chạy app:
+    flutter run
+
+Hoặc Android:
+    flutter run -d RFCY10YV9CV
+
+Kiểm tra Firebase Console > Realtime Database > Data
+- Nếu thấy dữ liệu từ app → SUCCESS ✅
+
+=============================================================================
+CÁCH SỬ DỤNG FIREBASE SERVICE
+=============================================================================
+
+Ví dụ 1: Thêm bidding order (Shipper gửi)
+
+    import 'package:green_route_app/core/services/firebase_service.dart';
+
+    void _submitOrder() async {
+      await FirebaseService.instance.addBiddingOrder({
+        'from': _fromCtrl.text,
+        'to': _toCtrl.text,
+        'goods': _goodsCtrl.text,
+        'weight': _weightCtrl.text,
+        'price': _priceCtrl.text,
+        'pickup': _pickupCtrl.text,
+        'deliver': _deliverCtrl.text,
+        'shipperName': shipperName,
+        'shipperPhone': shipperPhone,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đăng tìm tài xế thành công!')),
+      );
+    }
+
+
+Ví dụ 2: Hiển thị bidding orders realtime (Driver xem)
+
+    import 'package:firebase_database/firebase_database.dart';
+    import '../../../core/services/firebase_service.dart';
+
+    class FindDriverScreen extends StatelessWidget {
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          body: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: FirebaseService.instance.getBiddingOrdersStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return Center(child: Text('Lỗi: ${snapshot.error}'));
+              }
+
+              final orders = snapshot.data ?? [];
+
+              if (orders.isEmpty) {
+                return const Center(child: Text('Chưa có đơn'));
+              }
+
+              return ListView.builder(
+                itemCount: orders.length,
+                itemBuilder: (ctx, i) {
+                  final order = orders[i];
+                  return Card(
+                    margin: const EdgeInsets.all(8),
+                    child: ListTile(
+                      title: Text('${order['from']} → ${order['to']}'),
+                      subtitle: Text(order['goods']),
+                      trailing: Text('₫${order['price']}'),
+                      onTap: () {
+                        // Hiển thị chi tiết đơn
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      }
+    }
+
+
+Ví dụ 3: Empty trip (Matching cargo)
+
+    // Driver tạo trip
+    await FirebaseService.instance.addEmptyTrip({
+      'id': tripId,
+      'driverId': driverId,
+      'driverName': driverName,
+      'driverPhone': driverPhone,
+      'from': 'Hà Nội',
+      'to': 'Hải Phòng',
+      'containerType': '20ft',
+      'capacity': 10,
+      'proposedPrice': 5000000,
+      'pickupTime': '2025-12-07 08:00',
+      'deliveryTime': '2025-12-07 12:00',
+      'maxShippers': 3,
+    });
+
+    // Shipper join trip
+    await FirebaseService.instance.addShipperToTrip(tripId, {
+      'shipperId': shipperId,
+      'shipperName': shipperName,
+      'shipperPhone': shipperPhone,
+    });
+
+    // Hiển thị trips realtime
+    StreamBuilder<List<Map<String, dynamic>>>(
+      stream: FirebaseService.instance.getEmptyTripsStream(),
+      builder: (context, snapshot) {
+        // Hiển thị danh sách trips
+      },
+    )
+
+=============================================================================
+FIREBASE CONSOLE DEBUG & TESTING
+=============================================================================
+
+1. Vào Firebase Console > Realtime Database
+2. Tab "Data" - xem tất cả dữ liệu
+3. Click vào node để expand/collapse
+4. Tạo dữ liệu test bằng + button
+5. Xóa dữ liệu bằng nút delete (⋮)
+6. Tab "Rules" - kiểm tra rules và xem validate errors
+
+=============================================================================
+LỢI ÍCH CỦA FIREBASE REALTIME DATABASE
+=============================================================================
+
+✅ Realtime sync - Dữ liệu update ngay tức thì trên tất cả devices
+✅ Offline support - App vẫn work khi offline, sync khi online lại
+✅ No backend cần setup - Google quản lý infrastructure
+✅ Security rules - Kiểm soát quyền read/write
+✅ Scalable - Tự động scale khi có nhiều users
+✅ Free tier - Đủ cho app nhỏ hoặc testing
+✅ Web + Mobile - Cùng database cho web & app
+
+=============================================================================
+VẤN ĐỀ CÓ THỂ GẶP
+=============================================================================
+
+❌ "Target of URI doesn't exist: 'package:firebase_database/firebase_database.dart'"
+   → Chạy: flutter pub get
+
+❌ "com.google.gms.google-services plugin not found"
+   → Kiểm tra android/build.gradle có thêm classpath 'com.google.gms:google-services:...'
+   → Kiểm tra android/app/build.gradle có apply plugin: 'com.google.gms.google-services'
+
+❌ "google-services.json not found"
+   → Download từ Firebase Console
+   → Copy vào android/app/google-services.json
+
+❌ "Permission denied" lỗi khi write Firebase
+   → Kiểm tra Realtime Database Rules
+   → Chế độ test cho phép tất cả
+
+❌ "ConnectionState.waiting mãi không kết nối"
+   → Kiểm tra internet connection
+   → Kiểm tra Firebase Console có bật Realtime Database chưa
+   → Kiểm tra app có được activate Firebase chưa (Firebase.initializeApp)
+
+=============================================================================
+TƯỚC TIẾP THEO: MIGRATE HỆ THỐNG HIỆN TẠI
+=============================================================================
+
+Sau khi Firebase hoạt động, cần update các screens:
+
+1. CreateOrderScreen → Dùng FirebaseService thay OrderPoolService
+2. FindDriverScreen → Dùng FirebaseService stream thay hardcoded list
+3. CreateEmptyTripScreen → Dùng FirebaseService thay EmptyTripService
+4. MatchCargoScreen → Dùng FirebaseService stream thay SharedPreferences
+
+=============================================================================
+CÂU HỎI?
+=============================================================================
+
+Bạn chạy từng bước đấy, sau khi Firebase setup xong tôi sẽ giúp integrate vào app!

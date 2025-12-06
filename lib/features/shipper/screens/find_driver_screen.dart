@@ -5,10 +5,9 @@ import '../screens/confirm_booking_screen.dart';
 import '../widgets/driver_card.dart';
 
 class FindDriverScreen extends StatelessWidget {
-  // ĐÃ FIX: bỏ const ở đây vì có .map().toList()
-  FindDriverScreen({Key? key}) : super(key: key);
+  const FindDriverScreen({Key? key}) : super(key: key);
 
-  final List<Map<String, dynamic>> drivers = [
+  final List<Map<String, dynamic>> drivers = const [
     {
       'name': 'Nguyễn Văn A',
       'phone': '0987654321',
@@ -29,7 +28,7 @@ class FindDriverScreen extends StatelessWidget {
       'price': '4.200.000',
       'departure': '19-11-2025 07:00',
     },
-  ].map((e) => Map<String, dynamic>.from(e)).toList(); // ← vẫn giữ để fix bug web
+  ];
 
   @override
   Widget build(BuildContext context) {

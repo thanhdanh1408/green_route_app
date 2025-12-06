@@ -87,8 +87,15 @@ class EmptyTripService {
     required String cargoWeight,
     required String price,
   }) async {
+    debugPrint('🔍 joinEmptyTrip called:');
+    debugPrint('  tripId: $tripId');
+    debugPrint('  shipperId: $shipperId');
+    debugPrint('  shipperName: $shipperName');
+
     final prefs = await SharedPreferences.getInstance();
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+
+    debugPrint('📊 Total trips in storage: ${allTripsJson.length}');
 
     final tripIndex = allTripsJson.indexWhere((e) {
       final trip = EmptyTrip.fromJson(e);
@@ -102,6 +109,12 @@ class EmptyTripService {
 
     final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
 
+    debugPrint('📍 Trip found at index $tripIndex');
+    debugPrint('   Status: ${trip.status}');
+    debugPrint('   Joined: ${trip.joinedShippers.length}/${trip.maxShippers}');
+    debugPrint('   Joined shippers: ${trip.joinedShippers.map((s) => '${s.shipperId}(${s.shipperName})').toList()}');
+    debugPrint('   Raw JSON joinedShippers: ${trip.joinedShippers.map((s) => s.toMap()).toList()}');
+
     // Kiểm tra còn chỗ hay không
     if (!trip.hasAvailableSlots) {
       debugPrint('❌ Trip is full: $tripId');
@@ -110,6 +123,8 @@ class EmptyTripService {
 
     // Kiểm tra shipper chưa join chưa
     final alreadyJoined = trip.joinedShippers.any((s) => s.shipperId == shipperId);
+    debugPrint('✓ Already joined check: $alreadyJoined');
+    
     if (alreadyJoined) {
       debugPrint('❌ Shipper already joined: $shipperId');
       return false;
@@ -127,6 +142,9 @@ class EmptyTripService {
     );
 
     final updatedShippers = [...trip.joinedShippers, newShipper];
+
+    debugPrint('✅ Adding new shipper: $shipperId');
+    debugPrint('   New joined count: ${updatedShippers.length}');
 
     // Cập nhật trạng thái trip (nếu đầy thì đổi thành 'full')
     final newStatus = updatedShippers.length >= trip.maxShippers ? 'full' : trip.status;
