@@ -61,18 +61,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Thông tin tài xế
-              Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary,
-                    child: Text(widget.driver['name'][0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: Text(widget.driver['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${widget.driver['phone']}\n${widget.driver['vehicle']} • ${widget.driver['plate']}'),
-                ),
-              ),
-              const SizedBox(height: 20),
+              // Thông tin hàng hóa
               const Text('Thông tin hàng hóa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
 

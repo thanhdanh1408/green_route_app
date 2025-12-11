@@ -108,27 +108,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Thông tin tài xế (demo)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Thông tin tài xế', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                      const SizedBox(height: 8),
-                      Text('Họ và tên: Nguyễn Văn A'),
-                      Text('Số điện thoại: 0987654321'),
-                      Text('Loại xe: Xe tải trung'),
-                      Text('Biển số xe: 71A-8977'),
-                      Text('Tải trọng: 5 tấn'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
               // Thông tin hàng hóa
+
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),

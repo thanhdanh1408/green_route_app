@@ -1,9 +1,9 @@
-// settings_screen.dart
+// lib/features/driver/screens/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/custom_button.dart';
-import '../../auth/services/auth_service.dart';
+import '../../auth/screens/login_screen.dart';
+import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,86 +13,130 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
-
-  late TextEditingController _nameCtrl;
-  late TextEditingController _phoneCtrl;
-  late TextEditingController _addressCtrl;
-  late TextEditingController _bankCtrl;
-  late TextEditingController _accountCtrl;
-  late TextEditingController _accountNameCtrl;
+  String userName = '';
+  String userPhone = '';
+  bool notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadUserInfo();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _nameCtrl = TextEditingController(text: prefs.getString('name') ?? 'Công ty ABC');
-      _phoneCtrl = TextEditingController(text: prefs.getString('user_phone') ?? '0987654321');
-      _addressCtrl = TextEditingController(text: prefs.getString('address') ?? 'Quy Nhơn Bình Định');
-      _bankCtrl = TextEditingController(text: prefs.getString('bank') ?? 'Vietcombank');
-      _accountCtrl = TextEditingController(text: prefs.getString('account') ?? '123xxxxxxx');
-      _accountNameCtrl = TextEditingController(text: prefs.getString('account_name') ?? 'Trần C');
+      userName = prefs.getString('user_name') ?? 'Người dùng';
+      userPhone = prefs.getString('user_phone') ?? '';
+      notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
     });
   }
 
-  Future<void> _saveData() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  Future<void> _toggleNotifications(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('name', _nameCtrl.text);
-    await prefs.setString('address', _addressCtrl.text);
-    await prefs.setString('bank', _bankCtrl.text);
-    await prefs.setString('account', _accountCtrl.text);
-    await prefs.setString('account_name', _accountNameCtrl.text);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu thông tin thành công!'), backgroundColor: Colors.green),
-      );
-    }
+    await prefs.setBool('notifications_enabled', value);
+    setState(() => notificationsEnabled = value);
   }
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _phoneCtrl.dispose();
-    _addressCtrl.dispose();
-    _bankCtrl.dispose();
-    _accountCtrl.dispose();
-    _accountNameCtrl.dispose();
-    super.dispose();
-  }
+  void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
 
-  Widget _textField(TextEditingController controller, String label, {TextInputType keyboardType = TextInputType.text, FormFieldValidator<String>? validator, bool readOnly = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        validator: validator,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đổi mật khẩu'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Mật khẩu hiện tại',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Mật khẩu mới',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Xác nhận mật khẩu mới',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (newPasswordController.text == confirmPasswordController.text &&
+                  newPasswordController.text.length >= 6) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('user_password', newPasswordController.text);
+                
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đổi mật khẩu thành công!')),
+                  );
+                }
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Mật khẩu không khớp hoặc quá ngắn!')),
+                );
+              }
+            },
+            child: const Text('Đổi mật khẩu'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _infoSection(String title, List<Widget> fields) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
-        const SizedBox(height: 12),
-        ...fields,
-      ],
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -100,60 +144,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
         title: const Text('Cài đặt', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Quản lý thông tin cá nhân và tài khoản ngân hàng', style: TextStyle(fontSize: 14, color: Colors.grey)),
-              const SizedBox(height: 24),
-
-              // THÔNG TIN CÁ NHÂN
-              _infoSection('Thông tin cá nhân', [
-                _textField(_nameCtrl, 'Tên doanh nghiệp', validator: (v) => v!.isEmpty ? 'Nhập tên doanh nghiệp' : null),
-                _textField(_phoneCtrl, 'Số điện thoại', keyboardType: TextInputType.phone, readOnly: true),
-                _textField(_addressCtrl, 'Địa chỉ', validator: (v) => v!.isEmpty ? 'Nhập địa chỉ' : null),
-              ]),
-
-              const SizedBox(height: 24),
-
-              // TÀI KHOẢN NGÂN HÀNG
-              _infoSection('Tài khoản ngân hàng', [
-                _textField(_bankCtrl, 'Ngân hàng'),
-                _textField(_accountCtrl, 'Số tài khoản'),
-                _textField(_accountNameCtrl, 'Chủ tài khoản'),
-              ]),
-
-              const SizedBox(height: 32),
-              CustomButton(
-                label: 'Lưu tất cả thay đổi',
-                onPressed: _saveData,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  await AuthService.instance.logout();
-                  if (mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                  }
-                },
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+      body: ListView(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1)),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: AppColors.primary,
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                    style: const TextStyle(fontSize: 32, color: Colors.white),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(userName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(userPhone, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          _SectionHeader(title: 'Tài khoản'),
+          _SettingsTile(icon: Icons.lock_outline, title: 'Đổi mật khẩu', onTap: _showChangePasswordDialog),
+          _SettingsTile(
+            icon: Icons.language,
+            title: 'Ngôn ngữ',
+            trailing: const Text('Tiếng Việt'),
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Hiện chỉ hỗ trợ Tiếng Việt')),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _SectionHeader(title: 'Thông báo'),
+          SwitchListTile(
+            secondary: const Icon(Icons.notifications_outlined),
+            title: const Text('Thông báo đẩy'),
+            subtitle: const Text('Nhận thông báo về đơn hàng mới'),
+            value: notificationsEnabled,
+            onChanged: _toggleNotifications,
+          ),
+          const SizedBox(height: 8),
+          _SectionHeader(title: 'Về ứng dụng'),
+          _SettingsTile(icon: Icons.info_outline, title: 'Phiên bản', trailing: const Text('1.0.0'), onTap: () {}),
+          _SettingsTile(
+            icon: Icons.description_outlined,
+            title: 'Điều khoản sử dụng',
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xem điều khoản sử dụng'))),
+          ),
+          _SettingsTile(
+            icon: Icons.privacy_tip_outlined,
+            title: 'Chính sách bảo mật',
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xem chính sách bảo mật'))),
+          ),
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ElevatedButton.icon(
+              onPressed: _showLogoutDialog,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.logout),
+              label: const Text('Đăng xuất', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[600])),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+  final VoidCallback onTap;
+
+  const _SettingsTile({required this.icon, required this.title, this.trailing, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      trailing: trailing ?? const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

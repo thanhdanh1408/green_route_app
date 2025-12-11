@@ -63,31 +63,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // THÔNG TIN TÀI XẾ – ĐÃ FIX 100% NULL & WEB
-              Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primary,
-                    child: Text(
-                      () {
-                        final name = widget.driver['name']?.toString() ?? '';
-                        return name.isNotEmpty ? name[0].toUpperCase() : '?';
-                      }(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-                    ),
-                  ),
-                  title: Text(
-                    widget.driver['name']?.toString() ?? 'Tài xế không tên',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    '${widget.driver['phone']?.toString() ?? 'Chưa có SĐT'}\n'
-                    '${widget.driver['vehicle']?.toString() ?? 'Xe tải'} • ${widget.driver['plate']?.toString() ?? 'Chưa có biển số'}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
+              // Thông tin hàng hóa
               const Text('Thông tin hàng hóa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
 

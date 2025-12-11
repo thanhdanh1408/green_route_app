@@ -9,8 +9,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../../core/services/wallet_service.dart';
 import '../services/order_status_service.dart';
 import '../services/empty_trip_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TripTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> trip;
@@ -193,6 +195,23 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       // Đơn thường - cập nhật Order
                       await OrderStatusService.completeOrder(tripId);
                       debugPrint('✅ Completed regular order: $tripId');
+                    }
+                    
+                    // ✨ TỰ ĐỘNG CỘNG TIỀN VÀO VÍ
+                    final prefs = await SharedPreferences.getInstance();
+                    final driverId = prefs.getString('user_phone') ?? '';
+                    final priceStr = widget.trip['price'] as String?;
+                    
+                    if (priceStr != null && driverId.isNotEmpty) {
+                      // Parse price: "3.500.000 đ" -> 3500000
+                      final amount = double.tryParse(
+                        priceStr.replaceAll('.', '').replaceAll(' đ', '').replaceAll(',', '')
+                      ) ?? 0;
+                      
+                      if (amount > 0) {
+                        await WalletService.addTripEarnings(driverId, amount, tripId);
+                        debugPrint('💰 Added ${WalletService.formatCurrency(amount)} to wallet');
+                      }
                     }
                     
                     // Cập nhật UI
