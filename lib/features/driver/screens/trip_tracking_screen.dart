@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../services/order_status_service.dart';
+import '../services/empty_trip_service.dart';
 
 class TripTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> trip;
@@ -31,52 +33,87 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     _fetchRoute(); // Fetch real route on init
   }
 
-  // Fetch real route from OSRM (free routing service)
+  
+  // Fetch real route from OSRM with retry and multiple servers
   Future<void> _fetchRoute() async {
-    const start = LatLng(13.9833, 108.0000);
-    const end = LatLng(12.6667, 108.0500);
+    // Lấy coordinates thực từ trip data
+    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
 
-    try {
-      // OSRM public API - free, no key needed
-      final url = 'http://router.project-osrm.org/route/v1/driving/'
-          '${start.longitude},${start.latitude};'
-          '${end.longitude},${end.latitude}'
-          '?overview=full&geometries=geojson';
+    // Multiple OSRM servers for fallback
+    final osrmServers = [
+      'https://router.project-osrm.org',  // Primary (HTTPS)
+      'http://router.project-osrm.org',   // HTTP fallback
+      'https://routing.openstreetmap.de', // European backup
+    ];
 
-      final response = await http.get(Uri.parse(url));
+    debugPrint('🗺️ Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final coords = data['routes'][0]['geometry']['coordinates'] as List;
+    for (var i = 0; i < osrmServers.length; i++) {
+      try {
+        final server = osrmServers[i];
+        final url = '$server/route/v1/driving/'
+            '${start.longitude},${start.latitude};'
+            '${end.longitude},${end.latitude}'
+            '?overview=full&geometries=geojson';
 
-        setState(() {
-          routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
-          isLoadingRoute = false;
-        });
+        debugPrint('  🔄 Trying server ${i + 1}/${osrmServers.length}: $server');
+        
+        final response = await http.get(Uri.parse(url)).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('  ⏱️ Timeout on server ${i + 1}');
+            throw Exception('Timeout');
+          },
+        );
 
-        debugPrint('✅ Loaded real route with ${routePoints.length} points');
-      } else {
-        _useFallbackRoute();
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final coords = data['routes'][0]['geometry']['coordinates'] as List;
+
+          if (!mounted) return;
+          setState(() {
+            routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
+            isLoadingRoute = false;
+          });
+
+          debugPrint('✅ Loaded real route with ${routePoints.length} points from server ${i + 1}');
+          return; // Success! Exit
+        } else {
+          debugPrint('  ⚠️ Server ${i + 1} returned status ${response.statusCode}');
+          if (i < osrmServers.length - 1) {
+            debugPrint('  → Trying next server...');
+            continue; // Try next server
+          }
+        }
+      } catch (e) {
+        debugPrint('  ❌ Error with server ${i + 1}: $e');
+        if (i < osrmServers.length - 1) {
+          debugPrint('  → Trying next server...');
+          continue; // Try next server
+        }
       }
-    } catch (e) {
-      debugPrint('⚠️ Error fetching route: $e');
-      _useFallbackRoute();
     }
+
+    // All servers failed
+    debugPrint('❌ All OSRM servers failed, using fallback route');
+    _useFallbackRoute(start, end);
   }
 
   // Fallback to simulated route if OSRM fails
-  void _useFallbackRoute() {
+  void _useFallbackRoute(LatLng start, LatLng end) {
+    if (!mounted) return; // FIX: Check mounted trước khi setState
+    
+    // Tạo route đơn giản bằng cách nội suy giữa start và end
     setState(() {
       routePoints = [
-        const LatLng(13.9833, 108.0000),
-        const LatLng(13.7, 108.02),
-        const LatLng(13.4, 108.05),
-        const LatLng(13.1, 108.06),
-        const LatLng(12.9, 108.055),
-        const LatLng(12.6667, 108.0500),
+        start,
+        LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2),
+        end,
       ];
       isLoadingRoute = false;
     });
+    debugPrint('⚠️ Using fallback route (straight line)');
   }
 
   // CHỤP ẢNH
@@ -140,11 +177,52 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             if (deliveryPhoto != null)
               CustomButton(
                 label: 'Xác nhận giao hàng thành công',
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context);
-                  setState(() {
-                    currentStep = 3;
-                  });
+                  
+                  // LƯU TRẠNG THÁI HOÀN THÀNH VÀO DATABASE
+                  final tripType = widget.trip['tripType'];
+                  final tripId = widget.trip['id'];
+                  
+                  try {
+                    if (tripType == 'consolidated') {
+                      // Đơn ghép - cập nhật EmptyTrip
+                      await EmptyTripService.completeTrip(tripId);
+                      debugPrint('✅ Completed consolidated trip: $tripId');
+                    } else {
+                      // Đơn thường - cập nhật Order
+                      await OrderStatusService.completeOrder(tripId);
+                      debugPrint('✅ Completed regular order: $tripId');
+                    }
+                    
+                    // Cập nhật UI
+                    if (mounted) {
+                      setState(() {
+                        currentStep = 3;
+                      });
+                      
+                      // Hiển thị thông báo thành công
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Đã hoàn thành chuyến hàng!'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      
+                      // BỎ AUTO-NAVIGATE để user xem payment detail và tự back
+                    }
+                  } catch (e) {
+                    debugPrint('❌ Error completing trip: $e');
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Lỗi khi hoàn thành: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 },
               )
             else
@@ -283,6 +361,135 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             ),
             const SizedBox(height: 24),
 
+            // THÔNG TIN CHI TIẾT CHUYẾN HÀNG
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        const Text('Thông tin chuyến hàng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // Kiểm tra loại đơn
+                    if (widget.trip['tripType'] == 'consolidated') ...[
+                      // ĐƠN GHÉP - Hiển thị danh sách nhiều shipper
+                      _infoRow('Loại chuyến:', 'Đơn ghép', icon: Icons.layers, color: Colors.orange),
+                      _infoRow('Loại xe:', widget.trip['containerType'] ?? 'N/A', icon: Icons.local_shipping),
+                      _infoRow('Tải trọng:', widget.trip['capacity'] ?? 'N/A', icon: Icons.scale),
+                      const SizedBox(height: 12),
+                      const Text('Danh sách chủ hàng:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(height: 8),
+                      ...((widget.trip['joinedShippers'] as List?) ?? []).asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final shipper = entry.value as Map<String, dynamic>;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppColors.primary,
+                                    child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(shipper['name'] ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(shipper['phone'] ?? 'N/A', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.phone, color: Colors.green),
+                                    onPressed: () {
+                                      // TODO: Implement phone call
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 16),
+                              _smallInfoRow('Loại hàng:', shipper['cargoType'] ?? 'N/A'),
+                              _smallInfoRow('Khối lượng:', '${shipper['weight']} tấn'),
+                              _smallInfoRow('Giá:', shipper['price'] ?? 'N/A'),
+                              if ((shipper['fromDetail'] ?? '').isNotEmpty)
+                                _smallInfoRow('Điểm nhận:', shipper['fromDetail']),
+                              if ((shipper['toDetail'] ?? '').isNotEmpty)
+                                _smallInfoRow('Điểm giao:', shipper['toDetail']),
+                            ],
+                          ),
+                        );
+                      }),
+                    ] else ...[
+                      // ĐƠN THƯỜNG - Một shipper
+                      _infoRow('Loại chuyến:', 'Đơn thường', icon: Icons.assignment, color: Colors.blue),
+                      const SizedBox(height: 12),
+                      const Text('Thông tin hàng hóa:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(height: 8),
+                      _infoRow('Loại hàng:', widget.trip['goods'] ?? 'N/A', icon: Icons.inventory_2),
+                      _infoRow('Khối lượng:', widget.trip['weight'] ?? 'N/A', icon: Icons.scale),
+                      const Divider(height: 24),
+                      const Text('Thông tin chủ hàng:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _infoRow('Tên:', widget.trip['shipperName'] ?? 'N/A', icon: Icons.person),
+                                _infoRow('SĐT:', widget.trip['shipperPhone'] ?? 'N/A', icon: Icons.phone_android),
+                              ],
+                            ),
+                          ),
+                          if ((widget.trip['shipperPhone'] ?? '').isNotEmpty)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                // TODO: Implement phone call
+                              },
+                              icon: const Icon(Icons.phone, size: 18),
+                              label: const Text('Gọi'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if ((widget.trip['fromDetail'] ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _infoRow('Điểm nhận:', widget.trip['fromDetail'] ?? 'N/A', icon: Icons.location_on),
+                      ],
+                      if ((widget.trip['toDetail'] ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _infoRow('Điểm giao:', widget.trip['toDetail'] ?? 'N/A', icon: Icons.flag),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // HÀNH ĐỘNG
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -372,6 +579,24 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
     final tripId = widget.trip['id'];
     final shortId = tripId.length > 20 ? '${tripId.substring(0, 20)}...' : tripId;
     
+    // Lấy giá thực tế từ trip data
+    final priceString = widget.trip['price'] ?? '0';
+    // Remove any formatting characters (commas, spaces, đ, etc.)
+    final cleanPrice = priceString.toString().replaceAll(RegExp(r'[^\d]'), '');
+    final totalPrice = int.tryParse(cleanPrice) ?? 0;
+    
+    // Tính phí sàn 8%
+    final platformFee = (totalPrice * 0.08).round();
+    final netAmount = totalPrice - platformFee;
+    
+    // Format numbers with thousands separator
+    String formatCurrency(int amount) {
+      return amount.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]}.',
+      );
+    }
+    
     return Card(
       color: Colors.grey[50],
       child: Padding(
@@ -408,10 +633,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                 ],
               ),
             ),
-            _row('Giá cước:', '3.500.000 đ'),
-            _row('Phí sàn (8%):', '-280.000 đ', Colors.red),
+            _row('Giá cước:', '${formatCurrency(totalPrice)} đ'),
+            _row('Phí sàn (8%):', '-${formatCurrency(platformFee)} đ', Colors.red),
             const Divider(),
-            _row('Số tiền thực nhận:', '3.220.000 đ', Colors.green, true),
+            _row('Số tiền thực nhận:', '${formatCurrency(netAmount)} đ', Colors.green, true),
             const SizedBox(height: 8),
             const Text('Tiền sẽ được chuyển vào tài khoản ngân hàng\ndã liên kết trong vòng 24h', style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
@@ -426,6 +651,54 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(label), Text(value, style: TextStyle(color: color, fontWeight: bold ? FontWeight.bold : null))],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value, {IconData? icon, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: color ?? Colors.grey[600]),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.black87, fontSize: 14),
+                children: [
+                  TextSpan(text: label, style: const TextStyle(color: Colors.grey)),
+                  const TextSpan(text: ' '),
+                  TextSpan(
+                    text: value,
+                    style: TextStyle(fontWeight: FontWeight.w600, color: color),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _smallInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          ),
+        ],
       ),
     );
   }

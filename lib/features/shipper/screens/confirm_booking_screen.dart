@@ -1,7 +1,8 @@
 // lib/features/shipper/screens/confirm_booking_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/order_pool_service.dart';
+import '../services/booking_service.dart';
 
 class ConfirmBookingScreen extends StatefulWidget {
   final Map<String, dynamic> driver;
@@ -128,7 +129,11 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16)),
-                      onPressed: (_agreeTerms && _formKey.currentState!.validate()) ? _confirmBooking : null,
+                      onPressed: () {
+                        if (_agreeTerms && (_formKey.currentState?.validate() ?? false)) {
+                          _confirmBooking();
+                        }
+                      },
                       child: const Text('XÁC NHẬN ĐẶT XE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
@@ -141,22 +146,41 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
     );
   }
 
-  void _confirmBooking() {
-    OrderPoolService.instance.addOrder(
-      type: OrderType.normal,
-      from: _fromCtrl.text.trim(),
-      to: _toCtrl.text.trim(),
+  void _confirmBooking() async {
+    final prefs = await SharedPreferences.getInstance();
+    final shipperId = prefs.getString('user_phone') ?? '';
+    final shipperName = prefs.getString('name') ?? 'Chủ hàng';
+    
+    final price = int.tryParse(_priceCtrl.text.replaceAll('.', '')) ?? 0;
+    final insuranceFee = _insurance ? 160000 : 0;
+    final totalPrice = price + insuranceFee;
+    
+    // Gửi booking request cho tài xế
+    await BookingService.createBookingRequest(
+      driverId: widget.driver['phone']?.toString() ?? '',
+      driverName: widget.driver['name']?.toString() ?? '',
+      driverPhone: widget.driver['phone']?.toString() ?? '',
+      shipperId: shipperId,
+      shipperName: shipperName,
+      shipperPhone: shipperId,
+      from: '${widget.driver['route']?.toString().split('→')[0].trim() ?? ''}',
+      to: '${widget.driver['route']?.toString().split('→').last.trim() ?? ''}',
+      fromDetail: _fromCtrl.text.trim(),
+      toDetail: _toCtrl.text.trim(),
       goods: _goodsCtrl.text.trim(),
       weight: _weightCtrl.text.trim(),
-      price: _priceCtrl.text.replaceAll('.', '').trim(),
-      pickup: _pickupCtrl.text.isEmpty ? 'Chưa chọn' : _pickupCtrl.text,
-      deliver: _deliverCtrl.text.isEmpty ? 'Chưa chọn' : _deliverCtrl.text,
-      shipperName: widget.driver['name']?.toString() ?? 'Tài xế',
+      price: price.toString(),
+      pickupTime: _pickupCtrl.text.isEmpty ? 'Chưa chọn' : _pickupCtrl.text,
+      deliverTime: _deliverCtrl.text.isEmpty ? 'Chưa chọn' : _deliverCtrl.text,
+      hasInsurance: _insurance,
+      insuranceFee: insuranceFee.toString(),
+      totalPrice: totalPrice.toString(),
     );
 
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đặt xe thành công!'), backgroundColor: Colors.green),
+      const SnackBar(content: Text('Đã gửi yêu cầu tới tài xế!'), backgroundColor: Colors.green),
     );
   }
 
@@ -167,7 +191,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
         controller: controller,
         keyboardType: keyboardType,
         decoration: InputDecoration(labelText: label, hintText: hint, filled: true, fillColor: Colors.grey[50], border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-        validator: (v) => v!.trim().isEmpty ? 'Bắt buộc nhập' : null,
+        validator: (v) => (v?.trim().isEmpty ?? true) ? 'Bắt buộc nhập' : null,
       ),
     );
   }
@@ -194,7 +218,7 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
           );
           if (date != null) controller.text = '${date.day}/${date.month}/${date.year}';
         },
-        validator: (v) => v!.isEmpty ? 'Vui lòng chọn ngày' : null,
+        validator: (v) => (v?.isEmpty ?? true) ? 'Vui lòng chọn ngày' : null,
       ),
     );
   }

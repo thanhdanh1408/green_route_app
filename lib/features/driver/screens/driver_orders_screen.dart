@@ -8,6 +8,11 @@ import '../services/order_status_service.dart';
 import '../widgets/bid_bottom_sheet.dart';
 import '../widgets/empty_orders_widget.dart';
 import '../widgets/order_card.dart';
+import 'booking_requests_screen.dart';
+import '../services/order_status_service.dart';
+import '../widgets/bid_bottom_sheet.dart';
+import '../widgets/empty_orders_widget.dart';
+import '../widgets/order_card.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -96,6 +101,18 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
         backgroundColor: AppColors.primary,
         title: const Text('Đơn hàng', style: TextStyle(color: Colors.white)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BookingRequestsScreen()),
+              );
+            },
+            tooltip: 'Yêu cầu đặt xe',
+          ),
+        ],
       ),
       body: Column(
         children: [

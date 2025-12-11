@@ -39,9 +39,9 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
     final high = priceNum + 300000; // Tăng 300k
 
     prices = {
-      'Thấp': '${low.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
-      'Trung bình': '${mid.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
-      'Cao': '${high.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')}.000 đ',
+      'Thấp': '${low.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')} đ',
+      'Trung bình': '${mid.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')} đ',
+      'Cao': '${high.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')} đ',
     };
 
     selectedPrice = prices['Trung bình']!; // Default là trung bình
@@ -73,7 +73,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
             const Divider(),
 
             // Thông tin đơn
-            _infoRow('Mã chuyến hàng:', widget.order.id),
+            _buildOrderIdRow('Mã chuyến hàng:', widget.order.id),
             _infoRow('Tuyến đường:', '${widget.order.from} - ${widget.order.to}'),
             _infoRow('Khối lượng:', widget.order.weight),
             _infoRow('Ngày nhận:', widget.order.receiveDate),
@@ -119,9 +119,9 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
               child: Column(
                 children: [
                   _paymentRow('Giá đấu thầu:', selectedPrice),
-                  _paymentRow('Phí Green Route (8%):', '-${(double.parse(selectedPrice.replaceAll('.', '').replaceAll(' đ', '')) * 0.08).toStringAsFixed(0).replaceAll(RegExp(r'\B(?=(\d{3})+(?!\d))'), '.')}.000 đ', color: Colors.red),
+                  _paymentRow('Phí Green Route (8%):', '-${(double.parse(selectedPrice.replaceAll('.', '').replaceAll(' đ', '')) * 0.08).toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')} đ', color: Colors.red),
                   const Divider(),
-                  _paymentRow('Số tiền thực nhận:', '${(double.parse(selectedPrice.replaceAll('.', '').replaceAll(' đ', '')) * 0.92).toStringAsFixed(0).replaceAll(RegExp(r'\B(?=(\d{3})+(?!\d))'), '.')}.000 đ', bold: true),
+                  _paymentRow('Số tiền thực nhận:', '${(double.parse(selectedPrice.replaceAll('.', '').replaceAll(' đ', '')) * 0.92).toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => '.')} đ', bold: true),
                 ],
               ),
             ),
@@ -182,5 +182,29 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
   }
 
   Widget _infoRow(String label, String value) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label), Text(value, style: const TextStyle(fontWeight: FontWeight.w600))]));
+  
+  Widget _buildOrderIdRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   Widget _paymentRow(String label, String value, {Color? color, bool bold = false}) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label), Text(value, style: TextStyle(color: color, fontWeight: bold ? FontWeight.bold : null))]));
 }

@@ -37,7 +37,20 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
 
   // Options for dropdowns
   final shipperOptions = ['1', '2', '3', '4', '5'];
-  final provinceOptions = ['Hà Nội', 'TP.HCM', 'Gia Lai', 'Đắk Lắk', 'Quảng Ngãi'];
+  // 11 tỉnh Khu vực Miền Trung Tây Nguyên sau sáp nhập
+  final provinceOptions = [
+    'Thành phố Huế',
+    'Thành phố Đà Nẵng',
+    'Tỉnh Thanh Hóa',
+    'Tỉnh Nghệ An',
+    'Tỉnh Hà Tĩnh',
+    'Tỉnh Quảng Trị',
+    'Tỉnh Quảng Ngãi',
+    'Tỉnh Khánh Hòa',
+    'Tỉnh Gia Lai',
+    'Tỉnh Đắk Lắk',
+    'Tỉnh Lâm Đồng',
+  ];
 
   @override
   void dispose() {

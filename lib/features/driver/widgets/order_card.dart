@@ -11,7 +11,6 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusText = _getStatusText(order.bidStatus);
     final statusColor = _getStatusColor(order.bidStatus);
-    final icon = _getStatusIcon(order.bidStatus);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -23,11 +22,6 @@ class OrderCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: statusColor.withOpacity(0.1),
-                child: Text(icon, style: TextStyle(color: statusColor, fontSize: 20)),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,6 +32,23 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text('${order.goods} • ${order.weight} tấn', style: TextStyle(color: Colors.grey[700])),
+                    if (order.shipperName != null && order.shipperName!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.person, size: 14, color: Colors.grey[600]),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Chủ hàng: ${order.shipperName}${order.shipperPhone != null && order.shipperPhone!.isNotEmpty ? " • ${order.shipperPhone}" : ""}',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -77,19 +88,6 @@ class OrderCard extends StatelessWidget {
         return Colors.grey;
       default:
         return Colors.blue;
-    }
-  }
-
-  String _getStatusIcon(String? status) {
-    switch (status) {
-      case 'pending':
-        return '⏳';
-      case 'accepted':
-        return '🚚';
-      case 'completed':
-        return '✓';
-      default:
-        return '💡';
     }
   }
 }

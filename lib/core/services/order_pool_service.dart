@@ -68,6 +68,7 @@ class OrderPoolService extends ChangeNotifier {
     required String pickup,
     required String deliver,
     required String shipperName,
+    String? shipperPhone,
   }) {
     // FIX BUG TRÙNG: chỉ thêm nếu chưa tồn tại (dựa vào from-to-goods)
     final exists = _orders.any((o) =>
@@ -89,6 +90,7 @@ class OrderPoolService extends ChangeNotifier {
       pickupTime: pickup,
       deliverTime: deliver,
       shipperName: shipperName,
+      shipperPhone: shipperPhone,
     );
 
     _orders.add(order);

@@ -14,6 +14,7 @@ class OrderModel {
   final String deliverDate;
   final String? shipperName;
   final String? shipperPhone;
+  final String? completedAt; // Timestamp khi hoàn thành
   final String bidStatus; // 'available' | 'waiting' | 'accepted' | 'completed'
 
   const OrderModel({
@@ -29,6 +30,7 @@ class OrderModel {
     required this.deliverDate,
     this.shipperName,
     this.shipperPhone,
+    this.completedAt,
     this.bidStatus = 'available',
   });
 
@@ -47,6 +49,7 @@ class OrderModel {
       'deliverDate': deliverDate,
       'shipperName': shipperName,
       'shipperPhone': shipperPhone,
+      'completedAt': completedAt,
       'bidStatus': bidStatus,
     };
   }
@@ -66,6 +69,7 @@ class OrderModel {
       deliverDate: map['deliverDate'] as String,
       shipperName: map['shipperName'] as String?,
       shipperPhone: map['shipperPhone'] as String?,
+      completedAt: map['completedAt'] as String?,
       bidStatus: map['bidStatus'] as String? ?? 'available',
     );
   }
@@ -76,15 +80,16 @@ class OrderModel {
       id: bid['orderId'] ?? '',
       from: bid['from'] ?? '',
       to: bid['to'] ?? '',
-      fromDetail: '', // Bid doesn't have details usually
-      toDetail: '',
+      fromDetail: bid['fromDetail'] ?? '',
+      toDetail: bid['toDetail'] ?? '',
       weight: bid['weight'] ?? '',
       goods: bid['goods'] ?? 'Hàng hóa',
       price: bid['bidPrice'] ?? '', // Using bidPrice as the price
       receiveDate: '', // Not in bid
       deliverDate: '',
-      shipperName: '',
-      shipperPhone: '',
+      shipperName: bid['shipperName'] ?? '',
+      shipperPhone: bid['shipperPhone'] ?? '',
+      completedAt: bid['completedAt'] as String?,
       bidStatus: bid['status'] ?? 'pending',
     );
   }
@@ -97,7 +102,7 @@ class OrderModel {
       OrderModel.fromMap(jsonDecode(source) as Map<String, dynamic>);
 
   // COPY WITH METHOD ĐỂ THAY ĐỔI TRẠNG THÁI
-  OrderModel copyWith({String? bidStatus}) {
+  OrderModel copyWith({String? bidStatus, String? completedAt}) {
     return OrderModel(
       id: id,
       from: from,
@@ -111,6 +116,7 @@ class OrderModel {
       deliverDate: deliverDate,
       shipperName: shipperName,
       shipperPhone: shipperPhone,
+      completedAt: completedAt ?? this.completedAt,
       bidStatus: bidStatus ?? this.bidStatus,
     );
   }

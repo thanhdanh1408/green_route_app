@@ -5,6 +5,7 @@ import 'find_driver_screen.dart';
 import 'match_cargo_screen.dart';
 import 'my_orders_screen.dart';
 import 'history_screen.dart';
+import '../../driver/screens/wallet_screen.dart';
 import 'settings_screen.dart';
 import 'create_order_screen.dart';
 
@@ -18,11 +19,12 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
   int _selectedIndex = 0;
 
   static final List<Widget> _pages = [
-    FindDriverScreen(),     // ← Ở đây sẽ có danh sách tài xế có sẵn
-    MatchCargoScreen(),     // ✅ Xóa const để cho phép rebuild
-    MyOrdersScreen(),
-    const HistoryScreen(),
-    const SettingsScreen(),
+    FindDriverScreen(),     // Tab 0: Tìm tài xế
+    MatchCargoScreen(),     // Tab 1: Ghép hàng
+    MyOrdersScreen(),       // Tab 2: Đơn hàng
+    const HistoryScreen(),  // Tab 3: Lịch sử
+    const WalletScreen(),   // Tab 4: Ví tiền
+    const SettingsScreen(), // Tab 5: Cài đặt
   ];
 
   // FAB: ĐĂNG TÌM TÀI XẾ (chờ tài xế nhận)
@@ -85,6 +87,7 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.sync_alt), label: 'Ghép hàng'),
           BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Đơn hàng'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+          BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Ví tiền'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Cài đặt'),
         ],
       ),

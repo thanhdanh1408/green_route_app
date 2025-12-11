@@ -460,6 +460,53 @@ class EmptyTripService {
     //...
   }
 
+  // Complete consolidated trip - mark as completed
+  static Future<void> completeTrip(String tripId) async {
+    debugPrint('✅ Completing consolidated trip: $tripId');
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+    
+    if (tripIndex == -1) {
+      debugPrint('❌ Trip not found: $tripId');
+      return;
+    }
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    final updatedTrip = trip.copyWith(status: 'completed');
+    
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+    
+    debugPrint('  ✅ Trip $tripId marked as completed in empty_trips');
+    
+    // QUAN TRỌNG: Cập nhật tất cả shipper orders trong shipper_waiting_orders
+    final waitingOrdersJson = prefs.getStringList('shipper_waiting_orders') ?? [];
+    debugPrint('  📋 Checking ${waitingOrdersJson.length} shipper orders for tripId: $tripId');
+    
+    int updatedCount = 0;
+    final updatedOrders = waitingOrdersJson.map((orderJson) {
+      try {
+        final order = jsonDecode(orderJson) as Map<String, dynamic>;
+        if (order['tripId'] == tripId) {
+          debugPrint('    ✓ Found shipper order: ${order['id']}, updating status to completed');
+          order['status'] = 'completed';
+          updatedCount++;
+        }
+        return jsonEncode(order);
+      } catch (e) {
+        debugPrint('    ⚠️ Error parsing order: $e');
+        return orderJson;
+      }
+    }).toList();
+    
+    await prefs.setStringList('shipper_waiting_orders', updatedOrders);
+    debugPrint('  ✅ Updated $updatedCount shipper orders to completed');
+    
+    _tripStreamController.add(null);
+  }
+
   // ========== CLEAR & DEBUG ==========
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();

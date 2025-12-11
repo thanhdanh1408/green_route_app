@@ -58,21 +58,34 @@ class DriverAvailableOrdersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orders = OrderPoolService.instance.availableOrders;
+    return FutureBuilder<List<OrderModel>>(
+      future: OrderStatusService.getBiddingOrders(),
+      builder: (context, snapshot) {
+        // Lấy danh sách tất cả các đơn đã bid (bất kể pending hay accepted)
+        final biddingOrderIds = (snapshot.data ?? []).map((o) => o.id).toSet();
+        
+        // Filter out đơn đã bid
+        final availableOrders = OrderPoolService.instance.availableOrders
+            .where((order) => !biddingOrderIds.contains(order.id))
+            .toList();
+        
+        debugPrint('📦 Available orders: ${OrderPoolService.instance.availableOrders.length}');
+        debugPrint('📝 Bidding orders: ${biddingOrderIds.length}');
+        debugPrint('✅ Showing: ${availableOrders.length}');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Đơn hàng đang chờ'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: orders.isEmpty
-          ? const Center(child: Text('Chưa có đơn hàng nào', style: TextStyle(fontSize: 18)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: orders.length,
-              itemBuilder: (_, i) {
-                final o = orders[i];
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Đơn hàng đang chờ'),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+          ),
+          body: availableOrders.isEmpty
+              ? const Center(child: Text('Chưa có đơn hàng nào', style: TextStyle(fontSize: 18)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: availableOrders.length,
+                  itemBuilder: (_, i) {
+                    final o = availableOrders[i];
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -126,6 +139,8 @@ class DriverAvailableOrdersScreen extends StatelessWidget {
                 );
               },
             ),
+        );
+      },
     );
   }
 }

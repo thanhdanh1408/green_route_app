@@ -91,12 +91,19 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          // Tabs
-          TabBar(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Đơn hàng của chủ hàng'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            // Tabs
+            TabBar(
             tabs: [
               Tab(
                 child: Row(
@@ -145,6 +152,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           ),
         ],
       ),
+    )
     );
   }
 
@@ -152,9 +160,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     return ValueListenableBuilder<List<PooledOrder>>(
       valueListenable: OrderPoolService.instance.ordersNotifier,
       builder: (context, orders, _) {
-        // Lọc ra các đơn hàng chưa hoàn thành để hiển thị
+        // Lọc ra các đơn hàng chưa hoàn thành và chưa accepted để hiển thị
         final activeOrders = orders
-            .where((o) => o.status != OrderStatus.completed)
+            .where((o) => o.status != OrderStatus.completed && o.status != OrderStatus.accepted)
             .toList();
 
         if (activeOrders.isEmpty) {

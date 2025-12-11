@@ -1,6 +1,7 @@
 // lib/features/shipper/screens/create_order_screen.dart
 import 'package:flutter/material.dart';
 import 'package:green_route_app/core/services/order_pool_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 
@@ -185,6 +186,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     }
 
     // ĐĂNG ĐƠN
+    final prefs = await SharedPreferences.getInstance();
+    final shipperPhone = prefs.getString('user_phone') ?? '';
+    final shipperName = prefs.getString('name') ?? 'Công ty ABC';
+    
     OrderPoolService.instance.addOrder(
       type: OrderType.normal,
       from: _fromCtrl.text,
@@ -194,7 +199,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       price: _priceCtrl.text,
       pickup: _pickupCtrl.text,
       deliver: _deliverCtrl.text,
-      shipperName: 'Công ty ABC',
+      shipperName: shipperName,
+      shipperPhone: shipperPhone,
     );
 
     if (!mounted) return;

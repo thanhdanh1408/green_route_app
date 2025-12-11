@@ -9,24 +9,14 @@ class FindDriverScreen extends StatelessWidget {
 
   final List<Map<String, dynamic>> drivers = const [
     {
-      'name': 'Nguyễn Văn A',
+      'name': 'Nguyễn Văn Nam',
       'phone': '0987654321',
-      'vehicle': 'Xe tải trung',
-      'plate': '71A-8977',
-      'rating': 4.9,
+      'vehicle': 'Xe tải 5 tấn',
+      'plate': '81C-12345',
+      'rating': 4.8,
       'route': 'Gia Lai → Đắk Lắk',
-      'price': '3.500.000',
+      'price': '3.200.000',
       'departure': '18-11-2025 08:00',
-    },
-    {
-      'name': 'Trần Thị C',
-      'phone': '0901234567',
-      'vehicle': 'Xe tải 8 tấn',
-      'plate': '71B-12345',
-      'rating': 4.7,
-      'route': 'Pleiku → Quy Nhơn',
-      'price': '4.200.000',
-      'departure': '19-11-2025 07:00',
     },
   ];
 
@@ -37,7 +27,7 @@ class FindDriverScreen extends StatelessWidget {
         title: const Text('Tìm tài xế'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        elevation: 0,
+        centerTitle: true,
       ),
       body: Column(
         children: [
