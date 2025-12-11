@@ -1,11 +1,13 @@
 // lib/features/driver/screens/driver_orders_screen.dart
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/order_pool_service.dart';
 import '../models/order_model.dart';
-import '../services/driver_service.dart';
 import '../services/order_status_service.dart';
 import '../widgets/bid_bottom_sheet.dart';
+import '../widgets/empty_orders_widget.dart';
+import '../widgets/order_card.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -13,268 +15,194 @@ class DriverOrdersScreen extends StatefulWidget {
   State<DriverOrdersScreen> createState() => _DriverOrdersScreenState();
 }
 
-class _DriverOrdersScreenState extends State<DriverOrdersScreen> {
-  List<OrderModel> allOrders = [];
-  Timer? _refreshTimer;
+class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  StreamSubscription? _orderUpdateSubscription;
+
+  // Dữ liệu cho mỗi tab
+  List<PooledOrder> _availableOrders = [];
+  List<OrderModel> _biddingOrders = [];
 
   @override
   void initState() {
     super.initState();
-    _loadAllData();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      _loadAllData();
+    _tabController = TabController(length: 2, vsync: this);
+
+    // Lắng nghe stream cập nhật
+    _orderUpdateSubscription = OrderStatusService.orderStream.listen((_) {
+      _loadAllData(); 
     });
+    
+    // Tải dữ liệu lần đầu
+    _loadAllData();
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _tabController.dispose();
+    _orderUpdateSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _loadAllData() async {
-    // 1. Load available orders từ DriverService
-    final availableOrders = await DriverService().getAvailableOrders();
-
-    // 2. Load stored driver orders (với bidStatus)
-    final storedOrders = await OrderStatusService.getAllOrders();
-
-    // 3. Load completed orders
-    final completedOrders = await OrderStatusService.getCompletedOrders();
-
-    // 4. Merge: 
-    // - Thêm all stored orders (waiting/accepted)
-    // - Thêm completed orders (transporting)
-    // - Thêm available orders chỉ nếu chưa bid/completed
-    final mergedOrders = <OrderModel>[];
-
-    // Thêm stored orders (waiting/accepted)
-    for (final stored in storedOrders) {
-      mergedOrders.add(stored);
-    }
-
-    // Thêm completed orders
-    // Không thêm vào danh sách main - chỉ show ở history screen
-
-    // Thêm available orders (chỉ những cái chưa bid/completed)
-    final allBiddedOrderIds = {...storedOrders.map((s) => s.id), ...completedOrders.map((c) => c.id)};
-    for (final available in availableOrders) {
-      if (!allBiddedOrderIds.contains(available.id)) {
-        mergedOrders.add(available.copyWith(bidStatus: 'available'));
-      }
-    }
-
-    setState(() {
-      allOrders = mergedOrders;
-    });
-
-    debugPrint('DriverOrdersScreen - Total orders: ${allOrders.length}');
-    for (final o in allOrders) {
-      debugPrint('  - ${o.id}: ${o.bidStatus}');
+    // Tải đơn hàng có sẵn từ order pool
+    final available = await OrderPoolService.getAvailableOrders();
+    
+    // Tải đơn đang đấu thầu (pending bids)
+    final bidding = await OrderStatusService.getBiddingOrders();
+    
+    if (mounted) {
+      setState(() {
+        _availableOrders = available;
+        _biddingOrders = bidding;
+      });
     }
   }
 
-  void _handleOrderTap(OrderModel order) {
-    if (order.bidStatus == 'available') {
-      // Hiển thị BidBottomSheet
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => BidBottomSheet(
-          order: order,
-          onBidSubmitted: () async {
-            await _loadAllData();
-          },
-        ),
-      );
-    } else if (order.bidStatus == 'waiting') {
-      // Hiển thị chi tiết đơn hàng
-      _showOrderDetails(order);
-    } else if (order.bidStatus == 'accepted') {
-      // Hiển thị thông báo và chuyển sang history
-      _showAcceptedNotification(order);
-    }
-  }
-
-  void _showOrderDetails(OrderModel order) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Chi tiết đơn hàng'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _detailRow('Mã chuyến:', order.id),
-              _detailRow('Tuyến:', '${order.from} → ${order.to}'),
-              _detailRow('Chi tiết từ:', order.fromDetail),
-              _detailRow('Chi tiết đến:', order.toDetail),
-              _detailRow('Khối lượng:', order.weight),
-              _detailRow('Giá đề xuất:', order.price),
-              _detailRow('Ngày nhận:', order.receiveDate),
-              _detailRow('Ngày giao:', order.deliverDate),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Đơn hàng đang chờ phản hồi từ chủ hàng...',
-                  style: TextStyle(fontStyle: FontStyle.italic, color: Colors.orange),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
+  void _handleAvailableOrderTap(PooledOrder order) {
+    // Convert PooledOrder to OrderModel for BidBottomSheet
+    final orderModel = OrderModel(
+      id: order.id,
+      from: order.from,
+      to: order.to,
+      fromDetail: order.fromDetail ?? '',
+      toDetail: order.toDetail ?? '',
+      weight: order.weight,
+      goods: order.goods,
+      price: order.price,
+      receiveDate: order.receiveDate,
+      deliverDate: order.deliverDate,
+      shipperName: order.shipperName,
+      shipperPhone: order.shipperPhone,
     );
-  }
 
-  void _showAcceptedNotification(OrderModel order) async {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('🎉 Chúc mừng!'),
-        content: const Text(
-          'Đơn hàng này đã được chủ hàng xác nhận.\nĐơn hàng sẽ được chuyển vào mục "Lịch sử" với trạng thái "Đang vận chuyển".',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // Chuyển accepted -> completed (Đang vận chuyển)
-              await OrderStatusService.completeOrder(order.id);
-              if (mounted) {
-                Navigator.pop(context);
-                await _loadAllData();
-              }
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BidBottomSheet(
+        order: orderModel,
+        onBidSubmitted: () {
+          // Stream sẽ tự động cập nhật UI
+        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final availableCount = allOrders.where((o) => o.bidStatus == 'available').length;
-    final waitingCount = allOrders.where((o) => o.bidStatus == 'waiting').length;
-    final acceptedCount = allOrders.where((o) => o.bidStatus == 'accepted').length;
-
-    return Column(
-      children: [
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        title: const Text('Đơn hàng', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
         Container(
-          padding: const EdgeInsets.all(16),
-          color: AppColors.primary.withOpacity(0.1),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Đơn hàng phù hợp với tuyến của bạn',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              if (allOrders.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Khả dụng: $availableCount • Chờ phản hồi: $waitingCount • Chấp nhận: $acceptedCount',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                  ),
-                ),
+          color: Colors.white,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: Colors.grey[600],
+            indicatorColor: AppColors.primary,
+            tabs: [
+              _buildTab('Đề xuất', _availableOrders.length),
+              _buildTab('Đang đấu thầu', _biddingOrders.length),
             ],
           ),
         ),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await _loadAllData();
-            },
-            child: allOrders.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Chưa có đơn hàng nào',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: allOrders.length,
-                    itemBuilder: (context, index) {
-                      final order = allOrders[index];
-
-                      // Xác định status UI
-                      String statusText = 'Khả dụng';
-                      Color statusBgColor = Colors.blue[100]!;
-                      Color statusTextColor = Colors.blue[800]!;
-                      String icon = '?';
-
-                      if (order.bidStatus == 'waiting') {
-                        statusText = 'Đang chờ phản hồi';
-                        statusBgColor = Colors.orange[100]!;
-                        statusTextColor = Colors.orange[800]!;
-                        icon = '⏳';
-                      } else if (order.bidStatus == 'accepted') {
-                        statusText = 'Đã chấp nhận';
-                        statusBgColor = Colors.green[100]!;
-                        statusTextColor = Colors.green[800]!;
-                        icon = '✓';
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: statusBgColor,
-                              child: Text(
-                                icon,
-                                style: TextStyle(
-                                  color: statusTextColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              '${order.from} → ${order.to}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text('${order.weight} tấn • ${order.price}'),
-                            trailing: Chip(
-                              backgroundColor: statusBgColor,
-                              label: Text(
-                                statusText,
-                                style: TextStyle(
-                                  color: statusTextColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            onTap: () => _handleOrderTap(order),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Đề xuất - Available orders from pool
+              _buildAvailableOrdersList(),
+              
+              // Tab 2: Đang đấu thầu - Pending bids
+              _buildBiddingOrdersList(),
+            ],
           ),
         ),
       ],
+      ),
     );
   }
 
-  Widget _detailRow(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(value)),
-      ],
-    ),
-  );
+  Widget _buildTab(String text, int count) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(text),
+          if (count > 0)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvailableOrdersList() {
+    if (_availableOrders.isEmpty) {
+      return const EmptyOrdersWidget(message: 'Chưa có đơn hàng đề xuất nào.');
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _availableOrders.length,
+        itemBuilder: (context, index) {
+          final order = _availableOrders[index];
+          // Convert to OrderModel for display
+          final orderModel = OrderModel(
+            id: order.id,
+            from: order.from,
+            to: order.to,
+            fromDetail: order.fromDetail ?? '',
+            toDetail: order.toDetail ?? '',
+            weight: order.weight,
+            goods: order.goods,
+            price: order.price,
+            receiveDate: order.receiveDate,
+            deliverDate: order.deliverDate,
+            bidStatus: 'available',
+          );
+          return OrderCard(
+            order: orderModel,
+            onTap: () => _handleAvailableOrderTap(order),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBiddingOrdersList() {
+    if (_biddingOrders.isEmpty) {
+      return const EmptyOrdersWidget(message: 'Chưa có đơn hàng nào đang đấu thầu.');
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _biddingOrders.length,
+        itemBuilder: (context, index) {
+          final order = _biddingOrders[index];
+          return OrderCard(order: order);
+        },
+      ),
+    );
+  }
 }

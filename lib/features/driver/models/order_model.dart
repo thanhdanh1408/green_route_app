@@ -8,6 +8,7 @@ class OrderModel {
   final String fromDetail;
   final String toDetail;
   final String weight;
+  final String goods;
   final String price;
   final String receiveDate;
   final String deliverDate;
@@ -22,6 +23,7 @@ class OrderModel {
     required this.fromDetail,
     required this.toDetail,
     required this.weight,
+    required this.goods,
     required this.price,
     required this.receiveDate,
     required this.deliverDate,
@@ -39,6 +41,7 @@ class OrderModel {
       'fromDetail': fromDetail,
       'toDetail': toDetail,
       'weight': weight,
+      'goods': goods,
       'price': price,
       'receiveDate': receiveDate,
       'deliverDate': deliverDate,
@@ -57,12 +60,32 @@ class OrderModel {
       fromDetail: map['fromDetail'] as String,
       toDetail: map['toDetail'] as String,
       weight: map['weight'] as String,
+      goods: map['goods'] as String? ?? 'Hàng hóa', // Default value if missing
       price: map['price'] as String,
       receiveDate: map['receiveDate'] as String,
       deliverDate: map['deliverDate'] as String,
       shipperName: map['shipperName'] as String?,
       shipperPhone: map['shipperPhone'] as String?,
       bidStatus: map['bidStatus'] as String? ?? 'available',
+    );
+  }
+
+  // TỪ BID DATA (OrderStatusService)
+  factory OrderModel.fromBid(Map<String, dynamic> bid) {
+    return OrderModel(
+      id: bid['orderId'] ?? '',
+      from: bid['from'] ?? '',
+      to: bid['to'] ?? '',
+      fromDetail: '', // Bid doesn't have details usually
+      toDetail: '',
+      weight: bid['weight'] ?? '',
+      goods: bid['goods'] ?? 'Hàng hóa',
+      price: bid['bidPrice'] ?? '', // Using bidPrice as the price
+      receiveDate: '', // Not in bid
+      deliverDate: '',
+      shipperName: '',
+      shipperPhone: '',
+      bidStatus: bid['status'] ?? 'pending',
     );
   }
 
@@ -82,6 +105,7 @@ class OrderModel {
       fromDetail: fromDetail,
       toDetail: toDetail,
       weight: weight,
+      goods: goods,
       price: price,
       receiveDate: receiveDate,
       deliverDate: deliverDate,

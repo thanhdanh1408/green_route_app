@@ -1,9 +1,12 @@
 // lib/features/driver/screens/trip_tracking_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 
@@ -18,11 +21,62 @@ class TripTrackingScreen extends StatefulWidget {
 class _TripTrackingScreenState extends State<TripTrackingScreen> {
   int currentStep = 0;
   File? deliveryPhoto;
+  List<LatLng> routePoints = []; // Real route from OSRM
+  bool isLoadingRoute = true;
 
   @override
   void initState() {
     super.initState();
     currentStep = widget.trip['progress'];
+    _fetchRoute(); // Fetch real route on init
+  }
+
+  // Fetch real route from OSRM (free routing service)
+  Future<void> _fetchRoute() async {
+    const start = LatLng(13.9833, 108.0000);
+    const end = LatLng(12.6667, 108.0500);
+
+    try {
+      // OSRM public API - free, no key needed
+      final url = 'http://router.project-osrm.org/route/v1/driving/'
+          '${start.longitude},${start.latitude};'
+          '${end.longitude},${end.latitude}'
+          '?overview=full&geometries=geojson';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final coords = data['routes'][0]['geometry']['coordinates'] as List;
+
+        setState(() {
+          routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
+          isLoadingRoute = false;
+        });
+
+        debugPrint('✅ Loaded real route with ${routePoints.length} points');
+      } else {
+        _useFallbackRoute();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error fetching route: $e');
+      _useFallbackRoute();
+    }
+  }
+
+  // Fallback to simulated route if OSRM fails
+  void _useFallbackRoute() {
+    setState(() {
+      routePoints = [
+        const LatLng(13.9833, 108.0000),
+        const LatLng(13.7, 108.02),
+        const LatLng(13.4, 108.05),
+        const LatLng(13.1, 108.06),
+        const LatLng(12.9, 108.055),
+        const LatLng(12.6667, 108.0500),
+      ];
+      isLoadingRoute = false;
+    });
   }
 
   // CHỤP ẢNH
@@ -38,9 +92,10 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
 
   // HIỆN DIALOG XÁC NHẬN
   void _showConfirmDialog() {
-    setState(() {
-      deliveryPhoto = null; // Reset ảnh
-    });
+    // REMOVED: Don't reset deliveryPhoto here - causes photo to disappear!
+    // setState(() {
+    //   deliveryPhoto = null;
+    // });
 
     showModalBottomSheet(
       context: context,
@@ -117,29 +172,52 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // PROGRESS BAR
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: steps.asMap().entries.map((e) {
-                int idx = e.key;
-                return Column(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: idx <= currentStep ? AppColors.primary : Colors.grey[300],
-                      child: idx < currentStep
-                          ? const Icon(Icons.check, color: Colors.white, size: 20)
-                          : Text('${idx + 1}', style: TextStyle(color: idx <= currentStep ? Colors.white : Colors.grey)),
+            // PROGRESS BAR WITH CONNECTORS - Evenly spaced
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  for (int idx = 0; idx < steps.length; idx++) ...[
+                    // Step circle with label
+                    Expanded(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: idx <= currentStep ? AppColors.primary : Colors.grey[300],
+                            child: idx < currentStep
+                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                : Text('${idx + 1}', style: TextStyle(color: idx <= currentStep ? Colors.white : Colors.grey)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            steps[idx],
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: idx <= currentStep ? Colors.black : Colors.grey,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(e.value, style: TextStyle(fontSize: 12, color: idx <= currentStep ? Colors.black : Colors.grey)),
+                    // Connector line (except after last step)
+                    if (idx < steps.length - 1)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          height: 2,
+                          margin: const EdgeInsets.only(bottom: 30, left: 4, right: 4),
+                          color: idx < currentStep ? AppColors.primary : Colors.grey[300],
+                        ),
+                      ),
                   ],
-                );
-              }).toList(),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
-            // BẢN ĐỒ
+            // BẢN ĐỒ - Using VietMap (Vietnam)
             Container(
               height: 300,
               decoration: BoxDecoration(
@@ -155,8 +233,16 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                   ),
                   children: [
                     TileLayer(
+                      // Using OpenStreetMap (works reliably)
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.green_route_app',
+                      
+                      // VietMap - To enable later when API key is fully activated
+                      // Contact VietMap support for correct URL format
+                      // Your API Key: 3a141d0814ed5d76db2b40f8b01fbef208d785344fcdc545
+                      // Possible formats to try:
+                      // - https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png?apikey=YOUR_KEY
+                      // - Contact: support@vietmap.vn or check https://docs.vietmap.vn/
                     ),
                     MarkerLayer(
                       markers: [
@@ -174,18 +260,23 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                         ),
                       ],
                     ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: [
-                            const LatLng(13.9833, 108.0000),
-                            const LatLng(12.6667, 108.0500),
-                          ],
-                          color: AppColors.primary,
-                          strokeWidth: 5,
-                        ),
-                      ],
-                    ),
+                    // Real road routing using OSRM API
+                    // Shows actual roads, not straight line
+                    if (routePoints.isNotEmpty)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: routePoints,
+                            color: AppColors.primary,
+                            strokeWidth: 4,
+                          ),
+                        ],
+                      ),
+                    // Loading indicator while fetching route
+                    if (isLoadingRoute)
+                      const Center(
+                        child: CircularProgressIndicator(),
+                      ),
                   ],
                 ),
               ),
@@ -228,10 +319,16 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                         ),
                       ),
                     ] else if (currentStep == 3) ...[
-                      Center(child: Icon(Icons.check_circle, size: 64, color: Colors.green)),
-                      const SizedBox(height: 16),
-                      const Text('Giao hàng thành công!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const Text('Chuyến hàng đã hoàn tất', style: TextStyle(color: Colors.grey)),
+                      Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.check_circle, size: 64, color: Colors.green),
+                            const SizedBox(height: 16),
+                            const Text('Giao hàng thành công!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                            const Text('Chuyến hàng đã hoàn tất', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       _paymentDetail(),
                       const SizedBox(height: 16),
@@ -272,6 +369,9 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   Widget _paymentDetail() {
+    final tripId = widget.trip['id'];
+    final shortId = tripId.length > 20 ? '${tripId.substring(0, 20)}...' : tripId;
+    
     return Card(
       color: Colors.grey[50],
       child: Padding(
@@ -280,7 +380,34 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
           children: [
             const Text('Chi tiết thanh toán', style: TextStyle(fontWeight: FontWeight.bold)),
             const Divider(),
-            _row('Mã chuyến:', widget.trip['id']),
+            // Trip ID row with copy button
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Mã chuyến:'),
+                  Row(
+                    children: [
+                      Text(shortId, style: const TextStyle(fontSize: 13)),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: tripId));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã sao chép mã chuyến'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: Icon(Icons.copy, size: 16, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             _row('Giá cước:', '3.500.000 đ'),
             _row('Phí sàn (8%):', '-280.000 đ', Colors.red),
             const Divider(),

@@ -1,12 +1,16 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 class EmptyTrip {
   final String id;
   final String driverId;
   final String driverName;
   final String driverPhone;
-  final String from;
-  final String to;
+  final String from; // e.g., "Hồ Chí Minh"
+  final String to; // e.g., "Hà Nội"
+  final String fromAddress; // Cụ thể: "Kho A, KCN Sóng Thần, Dĩ An, Bình Dương"
+  final String toAddress; // Cụ thể: "Kho B, KCN Nội Bài, Sóc Sơn, Hà Nội"
   final String containerType; // 'container20', 'container40', 'truck', etc.
   final String capacity; // e.g., "5 tấn", "10 tấn"
   final String proposedPrice; // Giá đề xuất cho toàn chuyến
@@ -24,6 +28,8 @@ class EmptyTrip {
     required this.driverPhone,
     required this.from,
     required this.to,
+    required this.fromAddress,
+    required this.toAddress,
     required this.containerType,
     required this.capacity,
     required this.proposedPrice,
@@ -34,11 +40,29 @@ class EmptyTrip {
     this.status = 'open',
   }) : createdAt = DateTime.now();
 
-  // Kiểm tra còn chỗ hay không
   bool get hasAvailableSlots => joinedShippers.length < maxShippers;
 
-  // Tính % lấp đầy chuyến
-  int get fillPercentage => ((joinedShippers.length / maxShippers) * 100).toInt();
+  double get totalJoinedWeight {
+    if (joinedShippers.isEmpty) return 0.0;
+    return joinedShippers
+        .map((s) => double.tryParse(s.cargoWeight) ?? 0.0)
+        .reduce((a, b) => a + b);
+  }
+
+  double get totalCapacityInTons {
+    // Extract number from a string like "10 tấn"
+    final numberPart = capacity.split(' ').first;
+    return double.tryParse(numberPart) ?? 0.0;
+  }
+
+  double get availableCapacityInTons => totalCapacityInTons - totalJoinedWeight;
+
+  double get fillPercentage {
+    final totalCap = totalCapacityInTons;
+    if (totalCap == 0) return 0;
+    final percentage = (totalJoinedWeight / totalCap) * 100;
+    return percentage.clamp(0, 100);
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -48,6 +72,8 @@ class EmptyTrip {
       'driverPhone': driverPhone,
       'from': from,
       'to': to,
+      'fromAddress': fromAddress,
+      'toAddress': toAddress,
       'containerType': containerType,
       'capacity': capacity,
       'proposedPrice': proposedPrice,
@@ -62,18 +88,20 @@ class EmptyTrip {
 
   factory EmptyTrip.fromMap(Map<String, dynamic> map) {
     return EmptyTrip(
-      id: map['id'] as String,
-      driverId: map['driverId'] as String,
-      driverName: map['driverName'] as String,
-      driverPhone: map['driverPhone'] as String,
-      from: map['from'] as String,
-      to: map['to'] as String,
-      containerType: map['containerType'] as String,
-      capacity: map['capacity'] as String,
-      proposedPrice: map['proposedPrice'] as String,
-      pickupTime: DateTime.parse(map['pickupTime'] as String),
-      deliveryTime: DateTime.parse(map['deliveryTime'] as String),
-      maxShippers: map['maxShippers'] as int,
+      id: map['id'] ?? '',
+      driverId: map['driverId'] ?? '',
+      driverName: map['driverName'] ?? '',
+      driverPhone: map['driverPhone'] ?? '',
+      from: map['from'] ?? '',
+      to: map['to'] ?? '',
+      fromAddress: map['fromAddress'] ?? 'Đang cập nhật...',
+      toAddress: map['toAddress'] ?? 'Đang cập nhật...',
+      containerType: map['containerType'] ?? '',
+      capacity: map['capacity'] ?? '',
+      proposedPrice: map['proposedPrice'] ?? '',
+      pickupTime: DateTime.parse(map['pickupTime'] ?? DateTime.now().toIso8601String()),
+      deliveryTime: DateTime.parse(map['deliveryTime'] ?? DateTime.now().toIso8601String()),
+      maxShippers: map['maxShippers'] as int? ?? 0,
       joinedShippers: (map['joinedShippers'] as List<dynamic>?)
               ?.map((s) => ShipperInTrip.fromMap(s as Map<String, dynamic>))
               .toList() ??
@@ -97,6 +125,8 @@ class EmptyTrip {
       driverPhone: driverPhone,
       from: from,
       to: to,
+      fromAddress: fromAddress,
+      toAddress: toAddress,
       containerType: containerType,
       capacity: capacity,
       proposedPrice: proposedPrice,
@@ -109,15 +139,18 @@ class EmptyTrip {
   }
 }
 
+@immutable
 class ShipperInTrip {
   final String shipperId;
   final String shipperName;
   final String shipperPhone;
   final String cargoType; // Loại hàng
-  final String cargoWeight; // Khối lượng
+  final String cargoWeight; // Khối lượng (e.g., "1.5")
   final String price; // Giá nhân khác nhau cho shipper này
+  final String fromDetail; // Địa điểm nhận hàng cụ thể
+  final String toDetail; // Địa điểm giao hàng cụ thể
   final DateTime joinedAt;
-  final String status; // 'pending' | 'confirmed' | 'picked' | 'delivered'
+  final String status; // 'pending' | 'approved' | 'picked' | 'delivered'
 
   ShipperInTrip({
     required this.shipperId,
@@ -126,7 +159,9 @@ class ShipperInTrip {
     required this.cargoType,
     required this.cargoWeight,
     required this.price,
-    required this.status,
+    this.fromDetail = '',
+    this.toDetail = '',
+    this.status = 'pending',
   }) : joinedAt = DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -137,6 +172,8 @@ class ShipperInTrip {
       'cargoType': cargoType,
       'cargoWeight': cargoWeight,
       'price': price,
+      'fromDetail': fromDetail,
+      'toDetail': toDetail,
       'joinedAt': joinedAt.toIso8601String(),
       'status': status,
     };
@@ -144,12 +181,14 @@ class ShipperInTrip {
 
   factory ShipperInTrip.fromMap(Map<String, dynamic> map) {
     return ShipperInTrip(
-      shipperId: map['shipperId'] as String,
-      shipperName: map['shipperName'] as String,
-      shipperPhone: map['shipperPhone'] as String,
-      cargoType: map['cargoType'] as String,
-      cargoWeight: map['cargoWeight'] as String,
-      price: map['price'] as String,
+      shipperId: map['shipperId'] ?? '',
+      shipperName: map['shipperName'] ?? '',
+      shipperPhone: map['shipperPhone'] ?? '',
+      cargoType: map['cargoType'] ?? '',
+      cargoWeight: map['cargoWeight']?.toString() ?? '0',
+      price: map['price'] ?? '',
+      fromDetail: map['fromDetail'] ?? '',
+      toDetail: map['toDetail'] ?? '',
       status: map['status'] as String? ?? 'pending',
     );
   }

@@ -22,9 +22,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
   Future<void> _loadDriverBids() async {
     final bids = await OrderStatusService.getShipperBids();
-    setState(() {
-      driverBids = bids;
-    });
+    if (mounted) {
+      setState(() {
+        driverBids = bids;
+      });
+    }
   }
 
   void _showOrderResult(BuildContext context, PooledOrder order) {
@@ -150,15 +152,20 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     return ValueListenableBuilder<List<PooledOrder>>(
       valueListenable: OrderPoolService.instance.ordersNotifier,
       builder: (context, orders, _) {
-        if (orders.isEmpty) {
+        // Lọc ra các đơn hàng chưa hoàn thành để hiển thị
+        final activeOrders = orders
+            .where((o) => o.status != OrderStatus.completed)
+            .toList();
+
+        if (activeOrders.isEmpty) {
           return const Center(child: Text('Chưa có đơn hàng nào', style: TextStyle(fontSize: 18, color: Colors.grey)));
         }
 
         return ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: orders.length,
+          itemCount: activeOrders.length,
           itemBuilder: (_, i) {
-            final o = orders[i];
+            final o = activeOrders[i];
             final isMatching = o.type == OrderType.matching;
             final status = o.status;
 
@@ -174,16 +181,26 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                 trailing: Chip(
                   backgroundColor: status == OrderStatus.pending
                       ? Colors.orange[100]
-                      : status == OrderStatus.accepted
+                      : status == OrderStatus.accepted || status == OrderStatus.delivering
                           ? Colors.green[100]
-                          : Colors.red[100],
+                          : status == OrderStatus.completed
+                              ? Colors.grey[300]
+                              : Colors.red[100],
                   label: Text(
                     status == OrderStatus.pending
                         ? 'Đang xử lý'
-                        : status == OrderStatus.accepted
+                        : status == OrderStatus.accepted || status == OrderStatus.delivering
                             ? 'Đang giao'
-                            : 'Bị từ chối',
-                    style: TextStyle(color: status == OrderStatus.pending ? Colors.orange[800] : status == OrderStatus.accepted ? Colors.green[800] : Colors.red[800]),
+                            : status == OrderStatus.completed
+                                ? 'Hoàn thành'
+                                : 'Bị từ chối',
+                    style: TextStyle(color: status == OrderStatus.pending 
+                        ? Colors.orange[800] 
+                        : status == OrderStatus.accepted || status == OrderStatus.delivering
+                            ? Colors.green[800]
+                            : status == OrderStatus.completed
+                                ? Colors.black87
+                                : Colors.red[800]),
                   ),
                 ),
               ),
@@ -270,19 +287,29 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
                         // Bid details
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Đơn hàng', style: TextStyle(color: Colors.grey[600])),
-                                Text(bid['orderId'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Đơn hàng', style: TextStyle(color: Colors.grey[600])),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    bid['orderId'] ?? '', 
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                ],
+                              ),
                             ),
+                            const SizedBox(width: 16),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text('Giá đề xuất', style: TextStyle(color: Colors.grey[600])),
+                                const SizedBox(height: 4),
                                 Text(
                                   bid['bidPrice'] ?? '',
                                   style: const TextStyle(
@@ -304,6 +331,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () {
+                                    // TODO: Implement reject logic if needed in the backend
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Đã từ chối bid này')),
                                     );
@@ -318,19 +346,26 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    // Cập nhật trạng thái đơn hàng ở phía tài xế
                                     final orderId = bid['orderId'] as String;
-                                    await OrderStatusService.acceptOrder(orderId);
+                                    final driverPhone = bid['driverPhone'] as String;
 
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Đã chọn ${bid['driverName']} giao hàng'),
-                                        backgroundColor: Colors.green,
-                                      ),
-                                    );
-                                    setState(() {
-                                      bid['status'] = 'accepted';
-                                    });
+                                    // 1. Tell service to accept this specific bid (backend call)
+                                    await OrderStatusService.shipperAcceptBid(orderId, driverPhone);
+                                    
+                                    // 2. Update the main order pool status to reflect the change in "My Orders" tab
+                                    OrderPoolService.instance.updateStatus(orderId, OrderStatus.accepted);
+
+                                    // 3. Show feedback to the user
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Đã chọn ${bid['driverName']} giao hàng'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                      // 4. Reload bids from service to remove the accepted one from this tab
+                                      await _loadDriverBids();
+                                    }
                                   },
                                   child: const Text('Chấp nhận'),
                                 ),

@@ -1,153 +1,192 @@
-// lib/features/driver/services/order_status_service.dart
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/services/order_pool_service.dart';
 import '../models/order_model.dart';
 
 class OrderStatusService {
-  static const String _driverOrdersKey = 'driver_orders'; // Danh sách orders của driver với bidStatus
-  static const String _shipper_bidsKey = 'shipper_received_bids'; // Shipper xem bids
-  static const String _completedOrdersKey = 'completed_orders'; // Lịch sử
+  static const String _driverBidsKey = 'driver_bids';
+  static const String _shipperReceivedBidsKey = 'shipper_received_bids';
 
-  // ========== QUẢN LÝ ORDERS CỦA DRIVER ==========
+  static final _orderStreamController = StreamController<void>.broadcast();
+  static Stream<void> get orderStream => _orderStreamController.stream;
 
-  // THÊM/UPDATE ĐƠN VÀO DANH SÁCH DRIVER
-  static Future<void> addWaitingOrder(OrderModel order) async {
+  static Future<void> driverSendBid(PooledOrder order, String bidPrice) async {
     final prefs = await SharedPreferences.getInstance();
-    final ordersList = prefs.getStringList(_driverOrdersKey) ?? [];
-    
-    final existingIndex = ordersList.indexWhere((e) => OrderModel.fromJson(e).id == order.id);
-    
-    if (existingIndex != -1) {
-      final existingOrder = OrderModel.fromJson(ordersList[existingIndex]);
-      // Nếu đã bid/accepted/completed rồi, không cho bid lại
-      if (existingOrder.bidStatus != 'available') {
-        debugPrint('⚠️ Bạn đã gửi giá đấu thầu cho đơn này rồi!');
-        return;
-      }
-    }
+    final driverId = prefs.getString('user_phone') ?? 'unknown_driver';
+    final driverName = prefs.getString('name') ?? 'Tài xế ẩn danh';
 
-    // Update order với bidStatus = 'waiting'
-    final updatedOrder = order.copyWith(bidStatus: 'waiting');
-    if (existingIndex != -1) {
-      ordersList[existingIndex] = updatedOrder.toJson();
-    } else {
-      ordersList.add(updatedOrder.toJson());
-    }
-    
-    await prefs.setStringList(_driverOrdersKey, ordersList);
-    await _notifyShipperAboutBid(order);
-  }
-
-  // CHUYỂN TRẠNG THÁI WAITING -> ACCEPTED (khi shipper accept bid)
-  static Future<void> acceptOrder(String orderId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final ordersList = prefs.getStringList(_driverOrdersKey) ?? [];
-    
-    final index = ordersList.indexWhere((e) => OrderModel.fromJson(e).id == orderId);
-    if (index != -1) {
-      final order = OrderModel.fromJson(ordersList[index]);
-      final updatedOrder = order.copyWith(bidStatus: 'accepted');
-      ordersList[index] = updatedOrder.toJson();
-      await prefs.setStringList(_driverOrdersKey, ordersList);
-    }
-  }
-
-  // CHUYỂN TRẠNG THÁI ACCEPTED -> COMPLETED (khi hoàn tất đơn)
-  static Future<void> completeOrder(String orderId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final ordersList = prefs.getStringList(_driverOrdersKey) ?? [];
-    
-    final index = ordersList.indexWhere((e) => OrderModel.fromJson(e).id == orderId);
-    if (index != -1) {
-      final order = OrderModel.fromJson(ordersList[index]);
-      
-      // Chuyển qua completed_orders với trạng thái 'transporting'
-      final completedOrder = order.copyWith(bidStatus: 'transporting');
-      final completedList = prefs.getStringList(_completedOrdersKey) ?? [];
-      completedList.add(completedOrder.toJson());
-      
-      // Xóa khỏi driver_orders
-      ordersList.removeAt(index);
-      
-      await prefs.setStringList(_driverOrdersKey, ordersList);
-      await prefs.setStringList(_completedOrdersKey, completedList);
-    }
-  }
-
-  // LẤY TẤT CẢ ORDERS CỦA DRIVER (tất cả trạng thái)
-  static Future<List<OrderModel>> getAllOrders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_driverOrdersKey) ?? [];
-    return list.map((e) => OrderModel.fromJson(e)).toList();
-  }
-
-  // LẤY DANH SÁCH WAITING ORDERS (theo trạng thái)
-  static Future<List<OrderModel>> getWaitingOrders() async {
-    final all = await getAllOrders();
-    return all.where((o) => o.bidStatus == 'waiting').toList();
-  }
-
-  // LẤY DANH SÁCH ACCEPTED ORDERS
-  static Future<List<OrderModel>> getAcceptedOrders() async {
-    final all = await getAllOrders();
-    return all.where((o) => o.bidStatus == 'accepted').toList();
-  }
-
-  // LẤY LỊCH SỬ (completed orders)
-  static Future<List<OrderModel>> getCompletedOrders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_completedOrdersKey) ?? [];
-    return list.map((e) => OrderModel.fromJson(e)).toList();
-  }
-
-  // ========== THÔNG BÁO SHIPPER ==========
-
-  static Future<void> _notifyShipperAboutBid(OrderModel order) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    final bidEntry = {
+    final bid = {
       'orderId': order.id,
-      'shipperName': order.shipperName,
-      'shipperPhone': order.shipperPhone,
-      'driverId': '0987654321', // Mock
-      'driverName': 'Tài xế Nguyễn Văn Nam', // Mock
-      'bidPrice': order.price,
-      'timestamp': DateTime.now().toIso8601String(),
+      'driverId': driverId,
+      'driverName': driverName,
+      'driverPhone': driverId, // Using phone as ID and phone
+      'bidPrice': bidPrice,
       'status': 'pending',
+      'from': order.from,
+      'to': order.to,
+      'goods': order.goods,
+      'weight': order.weight,
     };
 
-    final existingBids = prefs.getStringList(_shipper_bidsKey) ?? [];
-    final bidJson = jsonEncode(bidEntry);
-    if (!existingBids.contains(bidJson)) {
-      existingBids.add(bidJson);
-      await prefs.setStringList(_shipper_bidsKey, existingBids);
+    final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    final isDuplicate = shipperBids.any((s) {
+      final decoded = jsonDecode(s);
+      return decoded['orderId'] == order.id && decoded['driverId'] == driverId;
+    });
+
+    if (!isDuplicate) {
+      shipperBids.add(jsonEncode(bid));
+      await prefs.setStringList(_shipperReceivedBidsKey, shipperBids);
     }
 
-    debugPrint('Thông báo shipper: ${order.shipperName} có bid mới');
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    if (!driverBids.any((s) => jsonDecode(s)['orderId'] == order.id)) {
+       driverBids.add(jsonEncode(bid));
+       await prefs.setStringList(_driverBidsKey, driverBids);
+    }
+
+    _orderStreamController.add(null);
+  }
+
+  static Future<void> shipperAcceptBid(String orderId, String driverId) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    final updatedShipperBids = shipperBids.map((s) {
+      final bid = jsonDecode(s);
+      if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
+        bid['status'] = 'accepted';
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_shipperReceivedBidsKey, updatedShipperBids);
+
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+     final updatedDriverBids = driverBids.map((s) {
+      final bid = jsonDecode(s);
+      if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
+        bid['status'] = 'accepted';
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_driverBidsKey, updatedDriverBids);
+
+    _orderStreamController.add(null);
+  }
+
+  static Future<List<OrderModel>> getBiddingOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final orders = <OrderModel>[];
+    for (final s in driverBids) {
+      final bid = jsonDecode(s);
+      if (bid['status'] == 'pending') {
+        orders.add(OrderModel.fromBid(bid));
+      }
+    }
+    return orders;
+  }
+
+  static Future<List<OrderModel>> getDeliveringOrders() async {
+     final prefs = await SharedPreferences.getInstance();
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final orders = <OrderModel>[];
+    for (final s in driverBids) {
+      final bid = jsonDecode(s);
+      if (bid['status'] == 'accepted') {
+        orders.add(OrderModel.fromBid(bid));
+      }
+    }
+    return orders;
+  }
+
+  static Future<List<OrderModel>> getHistoryOrders() async {
+    return [];
   }
 
   static Future<List<Map<String, dynamic>>> getShipperBids() async {
     final prefs = await SharedPreferences.getInstance();
-    final bidsJson = prefs.getStringList(_shipper_bidsKey) ?? [];
-    final result = <Map<String, dynamic>>[];
+    final bidsJson = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    final pendingBids = <Map<String, dynamic>>[];
     for (final jsonStr in bidsJson) {
       try {
-        final decoded = jsonDecode(jsonStr) as Map<dynamic, dynamic>;
-        result.add(decoded.cast<String, dynamic>());
+        final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+        if (decoded['status'] == 'pending') {
+          pendingBids.add(decoded);
+        }
       } catch (e) {
         debugPrint('Error decoding bid: $e');
       }
     }
-    return result;
+    return pendingBids;
   }
 
-  // XÓA TẤT CẢ DỮ LIỆU
+  static Future<List<OrderModel>> getWaitingOrders() async {
+    return getBiddingOrders();
+  }
+
+  static Future<List<OrderModel>> getAcceptedOrders() async {
+    return getDeliveringOrders();
+  }
+
+  static Future<List<OrderModel>> getCompletedOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final orders = <OrderModel>[];
+    for (final s in driverBids) {
+      final bid = jsonDecode(s);
+      if (bid['status'] == 'completed') {
+        orders.add(OrderModel.fromBid(bid));
+      }
+    }
+    return orders;
+  }
+
+  static Future<void> addWaitingOrder(OrderModel order, String bidPrice) async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverId = prefs.getString('user_phone') ?? 'unknown_driver';
+    final driverName = prefs.getString('name') ?? 'Tài xế ẩn danh';
+
+    final bid = {
+      'orderId': order.id,
+      'driverId': driverId,
+      'driverName': driverName,
+      'driverPhone': driverId,
+      'bidPrice': bidPrice,
+      'status': 'pending',
+      'from': order.from,
+      'to': order.to,
+      'goods': order.goods,
+      'weight': order.weight,
+    };
+
+    final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    // Check duplication
+    final isDuplicate = shipperBids.any((s) {
+      final decoded = jsonDecode(s);
+      return decoded['orderId'] == order.id && decoded['driverId'] == driverId;
+    });
+
+    if (!isDuplicate) {
+      shipperBids.add(jsonEncode(bid));
+      await prefs.setStringList(_shipperReceivedBidsKey, shipperBids);
+    }
+
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    if (!driverBids.any((s) => jsonDecode(s)['orderId'] == order.id)) {
+       driverBids.add(jsonEncode(bid));
+       await prefs.setStringList(_driverBidsKey, driverBids);
+    }
+
+    _orderStreamController.add(null);
+  }
+
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_driverOrdersKey);
-    await prefs.remove(_completedOrdersKey);
-    await prefs.remove(_shipper_bidsKey);
+    await prefs.remove(_driverBidsKey);
+    await prefs.remove(_shipperReceivedBidsKey);
+    _orderStreamController.add(null);
   }
 }
-

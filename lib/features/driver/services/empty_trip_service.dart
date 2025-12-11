@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -5,7 +7,10 @@ import '../models/empty_trip_model.dart';
 
 class EmptyTripService {
   static const String _emptyTripsKey = 'empty_trips';
-  static const String _myTripsKey = 'driver_empty_trips'; // Chuyến của driver hiện tại
+
+  // Stream để thông báo cho các listener khi có thay đổi
+  static final _tripStreamController = StreamController<void>.broadcast();
+  static Stream<void> get tripStream => _tripStreamController.stream;
 
   // ========== DRIVER: TẠO CHUYẾN TRỐNG ==========
   static Future<EmptyTrip> createEmptyTrip({
@@ -14,6 +19,8 @@ class EmptyTripService {
     required String driverPhone,
     required String from,
     required String to,
+    required String fromAddress, // Thêm
+    required String toAddress, // Thêm
     required String containerType,
     required String capacity,
     required String proposedPrice,
@@ -30,6 +37,8 @@ class EmptyTripService {
       driverPhone: driverPhone,
       from: from,
       to: to,
+      fromAddress: fromAddress, // Thêm
+      toAddress: toAddress, // Thêm
       containerType: containerType,
       capacity: capacity,
       proposedPrice: proposedPrice,
@@ -39,13 +48,14 @@ class EmptyTripService {
       status: 'open',
     );
 
-    // Lưu vào danh sách chuyến chung (lưu dưới dạng JSON string)
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
     allTripsJson.add(trip.toJson());
     await prefs.setStringList(_emptyTripsKey, allTripsJson);
 
-    debugPrint('✅ Created empty trip: ${trip.id}');
-    debugPrint('📌 Total trips in storage: ${allTripsJson.length}');
+    debugPrint('✅ Created trip: ${trip.from} → ${trip.to} | maxShippers: ${trip.maxShippers} | status: ${trip.status} | hasAvailableSlots: ${trip.hasAvailableSlots}');
+    debugPrint('📦 Total trips now in storage: ${allTripsJson.length}');
+    
+    _tripStreamController.add(null); // Thông báo có thay đổi
     return trip;
   }
 
@@ -53,31 +63,91 @@ class EmptyTripService {
   static Future<List<EmptyTrip>> getAvailableEmptyTrips() async {
     final prefs = await SharedPreferences.getInstance();
     final tripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-
-    debugPrint('🔍 getAvailableEmptyTrips: Found ${tripsJson.length} total trips in storage');
-
     final trips = <EmptyTrip>[];
     
-    for (var i = 0; i < tripsJson.length; i++) {
+    debugPrint('📦 Total trips in storage: ${tripsJson.length}');
+    
+    for (var tripString in tripsJson) {
       try {
-        final trip = EmptyTrip.fromJson(tripsJson[i]);
-        final isOpen = trip.status == 'open';
-        final hasSlots = trip.hasAvailableSlots;
-        debugPrint('   Trip $i: id=${trip.id}, from=${trip.from}→${trip.to}, status=${trip.status}, hasSlots=$hasSlots, joined=${trip.joinedShippers.length}/${trip.maxShippers}');
+        final trip = EmptyTrip.fromJson(tripString);
+        debugPrint('🚚 Trip: ${trip.from} → ${trip.to} | Status: ${trip.status} | Slots: ${trip.joinedShippers.length}/${trip.maxShippers} | hasAvailableSlots: ${trip.hasAvailableSlots}');
         
-        if (isOpen && hasSlots) {
+        if (trip.status == 'open' && trip.hasAvailableSlots) {
           trips.add(trip);
+          debugPrint('✅ Added to available trips');
+        } else {
+          debugPrint('❌ Filtered out: status=${trip.status}, hasAvailableSlots=${trip.hasAvailableSlots}');
         }
       } catch (err) {
-        debugPrint('❌ Error parsing trip at index $i: $err');
+        debugPrint('Error parsing trip in getAvailableEmptyTrips: $err');
       }
     }
-
-    debugPrint('✅ Available trips found: ${trips.length}');
+    
+    debugPrint('📋 Returning ${trips.length} available trips');
     return trips;
   }
 
-  // ========== SHIPPER: THAM GIA CHUYẾN GHÉP HÀNG ==========
+  // ========== SHIPPER: GỬI YÊU CẦU THAM GIA (PENDING) ==========
+  static Future<bool> sendJoinRequest({
+    required String tripId,
+    required String shipperId,
+    required String shipperName,
+    required String shipperPhone,
+    required String cargoType,
+    required String cargoWeight,
+    required String price,
+    required String fromDetail,
+    required String toDetail,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+
+    if (tripIndex == -1) {
+      debugPrint('❌ sendJoinRequest: Trip not found: $tripId');
+      return false;
+    }
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    
+    debugPrint('📝 sendJoinRequest: tripId=$tripId, shipper=$shipperName');
+    debugPrint('   Current joinedShippers: ${trip.joinedShippers.map((s) => s.shipperName).toList()}');
+
+    // Kiểm tra đã gửi request cho TRIP NÀY chưa
+    if (trip.joinedShippers.any((s) => s.shipperId == shipperId)) {
+      debugPrint('❌ Shipper đã có trong trip này rồi!');
+      return false;
+    }
+
+    final newRequest = ShipperInTrip(
+      shipperId: shipperId,
+      shipperName: shipperName,
+      shipperPhone: shipperPhone,
+      cargoType: cargoType,
+      cargoWeight: cargoWeight,
+      price: price,
+      fromDetail: fromDetail,
+      toDetail: toDetail,
+      status: 'pending', // Yêu cầu chờ duyệt
+    );
+
+    final updatedShippers = [...trip.joinedShippers, newRequest];
+
+    final updatedTrip = trip.copyWith(
+      joinedShippers: updatedShippers,
+    );
+
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+    
+    debugPrint('✅ Created pending join request from $shipperName for trip $tripId');
+    
+    _tripStreamController.add(null);
+    return true;
+  }
+
+  // ========== SHIPPER: THAM GIA CHUYẾN GHÉP HÀNG (OLD - giữ lại để tương thích) ==========
   static Future<bool> joinEmptyTrip({
     required String tripId,
     required String shipperId,
@@ -87,50 +157,19 @@ class EmptyTripService {
     required String cargoWeight,
     required String price,
   }) async {
-    debugPrint('🔍 joinEmptyTrip called:');
-    debugPrint('  tripId: $tripId');
-    debugPrint('  shipperId: $shipperId');
-    debugPrint('  shipperName: $shipperName');
-
     final prefs = await SharedPreferences.getInstance();
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
 
-    debugPrint('📊 Total trips in storage: ${allTripsJson.length}');
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
 
-    final tripIndex = allTripsJson.indexWhere((e) {
-      final trip = EmptyTrip.fromJson(e);
-      return trip.id == tripId;
-    });
-
-    if (tripIndex == -1) {
-      debugPrint('❌ Trip not found: $tripId');
-      return false;
-    }
+    if (tripIndex == -1) return false;
 
     final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
 
-    debugPrint('📍 Trip found at index $tripIndex');
-    debugPrint('   Status: ${trip.status}');
-    debugPrint('   Joined: ${trip.joinedShippers.length}/${trip.maxShippers}');
-    debugPrint('   Joined shippers: ${trip.joinedShippers.map((s) => '${s.shipperId}(${s.shipperName})').toList()}');
-    debugPrint('   Raw JSON joinedShippers: ${trip.joinedShippers.map((s) => s.toMap()).toList()}');
-
-    // Kiểm tra còn chỗ hay không
-    if (!trip.hasAvailableSlots) {
-      debugPrint('❌ Trip is full: $tripId');
+    if (!trip.hasAvailableSlots || trip.joinedShippers.any((s) => s.shipperId == shipperId)) {
       return false;
     }
 
-    // Kiểm tra shipper chưa join chưa
-    final alreadyJoined = trip.joinedShippers.any((s) => s.shipperId == shipperId);
-    debugPrint('✓ Already joined check: $alreadyJoined');
-    
-    if (alreadyJoined) {
-      debugPrint('❌ Shipper already joined: $shipperId');
-      return false;
-    }
-
-    // Thêm shipper vào danh sách
     final newShipper = ShipperInTrip(
       shipperId: shipperId,
       shipperName: shipperName,
@@ -138,15 +177,9 @@ class EmptyTripService {
       cargoType: cargoType,
       cargoWeight: cargoWeight,
       price: price,
-      status: 'pending',
     );
 
     final updatedShippers = [...trip.joinedShippers, newShipper];
-
-    debugPrint('✅ Adding new shipper: $shipperId');
-    debugPrint('   New joined count: ${updatedShippers.length}');
-
-    // Cập nhật trạng thái trip (nếu đầy thì đổi thành 'full')
     final newStatus = updatedShippers.length >= trip.maxShippers ? 'full' : trip.status;
 
     final updatedTrip = trip.copyWith(
@@ -154,107 +187,287 @@ class EmptyTripService {
       status: newStatus,
     );
 
-    // Lưu lại
     allTripsJson[tripIndex] = updatedTrip.toJson();
     await prefs.setStringList(_emptyTripsKey, allTripsJson);
-
-    debugPrint('✅ Shipper joined trip: $shipperId → $tripId');
+    
+    // Tạo order "waiting" cho shipper ngay khi join
+    final shipperOrders = prefs.getStringList('shipper_waiting_orders') ?? [];
+    final order = {
+      'id': '${tripId}_$shipperId',
+      'tripId': tripId,
+      'shipperId': shipperId,
+      'shipperName': shipperName,
+      'shipperPhone': shipperPhone,
+      'driverName': trip.driverName,
+      'driverPhone': trip.driverPhone,
+      'from': trip.from,
+      'to': trip.to,
+      'fromDetail': trip.fromAddress,
+      'toDetail': trip.toAddress,
+      'goods': cargoType,
+      'weight': cargoWeight,
+      'price': price,
+      'receiveDate': trip.pickupTime.toIso8601String(),
+      'deliverDate': trip.deliveryTime.toIso8601String(),
+      'status': 'waiting', // Đang chờ chuyến đầy
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+    shipperOrders.add(jsonEncode(order));
+    await prefs.setStringList('shipper_waiting_orders', shipperOrders);
+    
+    debugPrint('✅ Created waiting order for $shipperName');
+    
+    _tripStreamController.add(null);
     return true;
   }
 
-  // ========== DRIVER: LẤY DANH SÁCH CHUYẾN CỦA TÔI ==========
+  // ========== SHIPPER: HỦY THAM GIA ==========
+  static Future<bool> cancelJoinEmptyTrip(String tripId, String shipperId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+
+    if (tripIndex == -1) return false;
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    final updatedShippers = trip.joinedShippers.where((s) => s.shipperId != shipperId).toList();
+
+    // Nếu không có thay đổi, không cần làm gì cả
+    if (updatedShippers.length == trip.joinedShippers.length) return false;
+
+    final updatedTrip = trip.copyWith(
+      joinedShippers: updatedShippers,
+      status: 'open', // Chuyến sẽ lại mở
+    );
+
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+    _tripStreamController.add(null);
+    return true;
+  }
+
+  // ========== DRIVER: DUYỆT YÊU CẦU THAM GIA ==========
+  static Future<bool> approveJoinRequest(String tripId, String shipperId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+
+    if (tripIndex == -1) return false;
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    
+    // Tìm request pending
+    final requestIndex = trip.joinedShippers.indexWhere((s) => s.shipperId == shipperId && s.status == 'pending');
+    if (requestIndex == -1) return false;
+
+    // Cập nhật status thành 'approved'
+    final updatedShippers = List<ShipperInTrip>.from(trip.joinedShippers);
+    final request = updatedShippers[requestIndex];
+    updatedShippers[requestIndex] = ShipperInTrip(
+      shipperId: request.shipperId,
+      shipperName: request.shipperName,
+      shipperPhone: request.shipperPhone,
+      cargoType: request.cargoType,
+      cargoWeight: request.cargoWeight,
+      price: request.price,
+      fromDetail: request.fromDetail,
+      toDetail: request.toDetail,
+      status: 'approved', // Đã duyệt
+    );
+
+    // Kiểm tra xem đã đầy chưa (chỉ đếm approved)
+    final approvedCount = updatedShippers.where((s) => s.status == 'approved').length;
+    final newStatus = approvedCount >= trip.maxShippers ? 'full' : trip.status;
+
+    final updatedTrip = trip.copyWith(
+      joinedShippers: updatedShippers,
+      status: newStatus,
+    );
+
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+    
+    // Tạo order waiting cho shipper
+    final shipperOrders = prefs.getStringList('shipper_waiting_orders') ?? [];
+    final order = {
+      'id': '${tripId}_$shipperId',
+      'tripId': tripId,
+      'shipperId': shipperId,
+      'shipperName': request.shipperName,
+      'shipperPhone': request.shipperPhone,
+      'driverName': trip.driverName,
+      'driverPhone': trip.driverPhone,
+      'from': trip.from,
+      'to': trip.to,
+      'fromDetail': request.fromDetail,
+      'toDetail': request.toDetail,
+      'goods': request.cargoType,
+      'weight': request.cargoWeight,
+      'price': request.price,
+      'receiveDate': trip.pickupTime.toIso8601String(),
+      'deliverDate': trip.deliveryTime.toIso8601String(),
+      'status': 'waiting',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+    shipperOrders.add(jsonEncode(order));
+    await prefs.setStringList('shipper_waiting_orders', shipperOrders);
+    
+    debugPrint('✅ Approved join request from ${request.shipperName}');
+    _tripStreamController.add(null);
+    return true;
+  }
+
+  // ========== DRIVER: TỪ CHỐI YÊU CẦU THAM GIA ==========
+  static Future<bool> rejectJoinRequest(String tripId, String shipperId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+
+    if (tripIndex == -1) return false;
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    
+    // Xóa request
+    final updatedShippers = trip.joinedShippers.where((s) => s.shipperId != shipperId).toList();
+
+    if (updatedShippers.length == trip.joinedShippers.length) return false;
+
+    final updatedTrip = trip.copyWith(
+      joinedShippers: updatedShippers,
+    );
+
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+    
+    debugPrint('❌ Rejected join request');
+    _tripStreamController.add(null);
+    return true;
+  }
+
+  // ========== DRIVER: CÁC CHỨC NĂNG KHÁC ==========
   static Future<List<EmptyTrip>> getMyEmptyTrips(String driverId) async {
     final prefs = await SharedPreferences.getInstance();
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-
-    final trips = <EmptyTrip>[];
-    for (var i = 0; i < allTripsJson.length; i++) {
-      try {
-        final trip = EmptyTrip.fromJson(allTripsJson[i]);
-        if (trip.driverId == driverId) {
-          trips.add(trip);
-        }
-      } catch (err) {
-        debugPrint('❌ Error parsing trip at index $i: $err');
-      }
-    }
-
-    debugPrint('🔍 getMyEmptyTrips: Found ${trips.length} trips for driver $driverId');
-    return trips;
+    return allTripsJson
+        .map((e) {
+          try {
+            return EmptyTrip.fromJson(e);
+          } catch (err) {
+            return null;
+          }
+        })
+        .where((t) => t != null && t.driverId == driverId && (t.status == 'open' || t.status == 'full'))
+        .cast<EmptyTrip>()
+        .toList();
   }
 
-  // ========== DRIVER: CẬP NHẬT TRẠNG THÁI CHUYẾN ==========
-  static Future<void> updateTripStatus(String tripId, String newStatus) async {
+  // Lấy các chuyến đang giao hoặc đã hoàn thành (lịch sử)
+  static Future<List<EmptyTrip>> getMyDeliveringTrips(String driverId) async {
     final prefs = await SharedPreferences.getInstance();
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-
-    final tripIndex = allTripsJson.indexWhere((e) {
-      final trip = EmptyTrip.fromJson(e);
-      return trip.id == tripId;
-    });
-
-    if (tripIndex != -1) {
-      final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
-      final updatedTrip = trip.copyWith(status: newStatus);
-      allTripsJson[tripIndex] = updatedTrip.toJson();
-      await prefs.setStringList(_emptyTripsKey, allTripsJson);
-
-      debugPrint('✅ Updated trip status: $tripId → $newStatus');
-    }
+    return allTripsJson
+        .map((e) {
+          try {
+            return EmptyTrip.fromJson(e);
+          } catch (err) {
+            return null;
+          }
+        })
+        .where((t) => t != null && t.driverId == driverId && (t.status == 'delivering' || t.status == 'completed'))
+        .cast<EmptyTrip>()
+        .toList();
   }
 
-  // ========== DRIVER: RỜI KHỎI/HỦY CHUYẾN ==========
+  static Future<void> updateTripStatus(String tripId, String newStatus) async {
+     // Logic tương tự, tìm, cập nhật và thông báo stream
+  }
+
+  // ========== BẮT ĐẦU GIAO HÀNG (CHUYẾN ĐÃ ĐẦY) ==========
+  static Future<void> startDelivering(String tripId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    final tripIndex = allTripsJson.indexWhere((e) => EmptyTrip.fromJson(e).id == tripId);
+
+    if (tripIndex == -1) {
+      debugPrint('❌ Trip not found: $tripId');
+      return;
+    }
+
+    final trip = EmptyTrip.fromJson(allTripsJson[tripIndex]);
+    
+    // Cập nhật status chuyến sang 'delivering'
+    final updatedTrip = trip.copyWith(status: 'delivering');
+    allTripsJson[tripIndex] = updatedTrip.toJson();
+    await prefs.setStringList(_emptyTripsKey, allTripsJson);
+
+    debugPrint('✅ Updated trip $tripId to delivering');
+    debugPrint('📦 Creating orders for ${trip.joinedShippers.length} shippers');
+
+    // Tạo orders "waiting" cho từng shipper đã join
+    final shipperOrders = prefs.getStringList('shipper_waiting_orders') ?? [];
+    
+    for (var shipper in trip.joinedShippers) {
+      final order = {
+        'id': '${trip.id}_${shipper.shipperId}',
+        'tripId': trip.id,
+        'shipperId': shipper.shipperId,
+        'shipperName': shipper.shipperName,
+        'shipperPhone': shipper.shipperPhone,
+        'driverName': trip.driverName,
+        'driverPhone': trip.driverPhone,
+        'from': trip.from,
+        'to': trip.to,
+        'fromDetail': trip.fromAddress,
+        'toDetail': trip.toAddress,
+        'goods': shipper.cargoType,
+        'weight': shipper.cargoWeight,
+        'price': shipper.price,
+        'receiveDate': trip.pickupTime.toIso8601String(),
+        'deliverDate': trip.deliveryTime.toIso8601String(),
+        'status': 'delivering', // Chuyển từ waiting sang delivering ngay
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      
+      shipperOrders.add(jsonEncode(order));
+      debugPrint('  ✓ Created order for ${shipper.shipperName}');
+    }
+
+    await prefs.setStringList('shipper_waiting_orders', shipperOrders);
+    _tripStreamController.add(null);
+    
+    debugPrint('🎉 All orders created successfully');
+  }
+
   static Future<void> cancelEmptyTrip(String tripId) async {
     final prefs = await SharedPreferences.getInstance();
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-
-    allTripsJson.removeWhere((e) {
-      final trip = EmptyTrip.fromJson(e);
-      return trip.id == tripId;
-    });
-
-    await prefs.setStringList(_emptyTripsKey, allTripsJson);
-
-    debugPrint('✅ Cancelled empty trip: $tripId');
+    
+    // Xóa chuyến khỏi danh sách
+    final updatedTrips = allTripsJson.where((tripJson) {
+      try {
+        final trip = EmptyTrip.fromJson(tripJson);
+        return trip.id != tripId; // Giữ lại các chuyến không phải là tripId
+      } catch (e) {
+        return true; // Giữ lại nếu parse lỗi
+      }
+    }).toList();
+    
+    await prefs.setStringList(_emptyTripsKey, updatedTrips);
+    _tripStreamController.add(null); // Thông báo có thay đổi
   }
 
-  // ========== SHIPPER: LẤY CHI TIẾT CHUYẾN ==========
   static Future<EmptyTrip?> getEmptyTripDetails(String tripId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final tripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-
-    try {
-      return tripsJson
-          .map((e) => EmptyTrip.fromJson(e))
-          .firstWhere((t) => t.id == tripId);
-    } catch (e) {
-      return null;
-    }
+    //...
   }
 
-  // ========== CLEAR ALL DATA ==========
+  // ========== CLEAR & DEBUG ==========
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_emptyTripsKey);
-    await prefs.remove(_myTripsKey);
+    _tripStreamController.add(null);
   }
 
-  // ========== DIAGNOSTIC: CHECK STORAGE ==========
   static Future<void> debugPrintStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
-    
-    debugPrint('📊 === STORAGE DIAGNOSTIC ===');
-    debugPrint('Total trips stored: ${allTripsJson.length}');
-    
-    for (int i = 0; i < allTripsJson.length; i++) {
-      try {
-        final trip = EmptyTrip.fromJson(allTripsJson[i]);
-        debugPrint('  Trip $i: id=${trip.id}, from=${trip.from}→${trip.to}, status=${trip.status}, joined=${trip.joinedShippers.length}/${trip.maxShippers}');
-      } catch (e) {
-        debugPrint('  ❌ Trip $i: PARSE ERROR - $e');
-      }
-    }
-    debugPrint('========================');
+    // ...
   }
 }

@@ -44,7 +44,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _hasRoute ? const DriverOrdersScreen() : const DriverRouteSelectionScreen(),
 
     // Tab 1: Ghép hàng → CHUYẾN CỦA TÀI XẾ
-    const DriverEmptyTripsScreen(),
+    DriverEmptyTripsScreen(
+      onNeedHistoryTab: () {
+        setState(() {
+          _currentIndex = 2; // Switch to History tab
+        });
+      },
+    ),
 
     // Tab 2: Lịch sử
     const HistoryScreen(),

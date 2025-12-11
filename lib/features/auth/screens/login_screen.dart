@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:green_route_app/features/auth/screens/role_selection_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../widgets/auth_input_field.dart';
@@ -126,28 +127,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           final identifier = _identifierController.text.trim();
                           final password = _passwordController.text;
 
-                          debugPrint('=== LOGIN DEBUG ===');
-                          debugPrint('Identifier: $identifier');
-                          debugPrint('Password: $password');
-                          debugPrint('FakeUsers keys: ${AuthService.instance.fakeUsers.keys.toList()}');
-                          
                           final user = await AuthService.instance.login(
                             identifier,
                             password,
                           );
                           
-                          debugPrint('Login result: $user');
-                          setState(() => _isLoading = false);
-
                           if (user != null && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Chào ${user['name']} 👋'),
-                                backgroundColor: AppColors.primary,
-                              ),
-                            );
-                            _navigateAfterLogin(user);
+                            // Lưu thông tin user vào SharedPreferences
+                            final prefs = await SharedPreferences.getInstance();
+                            final normalizedPhone = identifier == 'admin' ? 'admin' : identifier.replaceAll(RegExp(r'[^0-9]'), '');
+                            await prefs.setString('user_phone', normalizedPhone);
+                            await prefs.setString('name', user['name'] ?? '');
+                            await prefs.setString('user_role', user['role'] ?? '');
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Chào ${user['name']} 👋'),
+                                  backgroundColor: AppColors.primary,
+                                ),
+                              );
+                              _navigateAfterLogin(user);
+                            }
                           } else {
+                            setState(() => _isLoading = false);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(

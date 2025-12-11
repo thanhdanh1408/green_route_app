@@ -42,7 +42,9 @@ class DriverCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(data['route'] ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  _buildAddressRow(Icons.arrow_upward, data['fromAddress'] ?? 'N/A'),
+                  _buildAddressRow(Icons.arrow_downward, data['toAddress'] ?? 'N/A'),
+                  const SizedBox(height: 8),
                   Text('Giá: ${data['price'] ?? '0'}đ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green[700])),
                   Text('Xuất phát: ${data['departure'] ?? ''}', style: TextStyle(color: Colors.grey[600])),
                 ],
@@ -72,6 +74,16 @@ class DriverCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAddressRow(IconData icon, String address) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey[600], size: 16),
+        const SizedBox(width: 8),
+        Expanded(child: Text(address, style: const TextStyle(fontSize: 14))),
+      ],
     );
   }
 }

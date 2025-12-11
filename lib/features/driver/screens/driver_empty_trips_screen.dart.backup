@@ -7,11 +7,9 @@ import '../../../core/theme/app_theme.dart';
 import '../models/empty_trip_model.dart';
 import '../services/empty_trip_service.dart';
 import 'create_empty_trip_screen.dart';
-import 'trip_tracking_screen.dart';
 
 class DriverEmptyTripsScreen extends StatefulWidget {
-  final VoidCallback? onNeedHistoryTab;
-  const DriverEmptyTripsScreen({super.key, this.onNeedHistoryTab});
+  const DriverEmptyTripsScreen({super.key});
 
   @override
   State<DriverEmptyTripsScreen> createState() => _DriverEmptyTripsScreenState();
@@ -19,12 +17,15 @@ class DriverEmptyTripsScreen extends StatefulWidget {
 
 class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with SingleTickerProviderStateMixin {
   List<EmptyTrip> myTrips = [];
+  List<EmptyTrip> historyTrips = [];
   Timer? _refreshTimer;
   bool _isLoading = true;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     debugPrint('🚀 DriverEmptyTripsScreen initState - loading my trips');
     _loadMyTrips();
     _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
@@ -35,6 +36,7 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
 
   @override
   void dispose() {
+    _tabController.dispose();
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -44,10 +46,12 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
     final prefs = await SharedPreferences.getInstance();
     final driverId = prefs.getString('user_phone') ?? '';
     final trips = await EmptyTripService.getMyEmptyTrips(driverId);
+    final history = await EmptyTripService.getMyDeliveringTrips(driverId);
 
-    debugPrint('📍 DriverEmptyTripsScreen loaded ${trips.length} active trips');
+    debugPrint('📍 DriverEmptyTripsScreen loaded ${trips.length} active trips, ${history.length} history trips');
     setState(() {
       myTrips = trips;
+      historyTrips = history;
       _isLoading = false;
     });
   }
@@ -341,11 +345,9 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
                               if (mounted) {
                                 Navigator.pop(context);
                                 await _loadMyTrips();
-                                // Call callback to switch to History tab
-                                widget.onNeedHistoryTab?.call();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('✅ Bắt đầu giao hàng! Kiểm tra tại Lịch sử chuyến.'),
+                                    content: Text('✅ Bắt đầu giao hàng! Đơn hàng đã chuyển sang đang giao.'),
                                     backgroundColor: Colors.green,
                                   ),
                                 );
@@ -393,10 +395,7 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
-        title: const Text(
-          'Chuyến ghép hàng',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Chuyến ghép hàng của tôi', style: TextStyle(color: Colors.white)),
         centerTitle: true,
       ),
       body: _isLoading

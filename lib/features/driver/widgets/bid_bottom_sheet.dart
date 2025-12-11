@@ -86,8 +86,10 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
 
             const Text('Chọn giá đấu thầu của bạn', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 8.0, // Khoảng cách ngang
+              runSpacing: 8.0, // Khoảng cách dọc
+              alignment: WrapAlignment.spaceBetween,
               children: prices.entries.map((e) {
                 final isSelected = selectedPrice == e.value;
                 return GestureDetector(
@@ -153,7 +155,7 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
                       }
 
                       // Lưu đơn vào trạng thái "Đang chờ"
-                      await OrderStatusService.addWaitingOrder(widget.order);
+                      await OrderStatusService.addWaitingOrder(widget.order, selectedPrice);
 
                       if (!mounted) return;
                       Navigator.pop(context);

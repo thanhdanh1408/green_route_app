@@ -10,12 +10,18 @@ class PooledOrder {
   final OrderType type;
   final String from;
   final String to;
+  final String? fromDetail;
+  final String? toDetail;
   final String goods;
   final String weight;
   final String proposedPrice;
+  final String price; // Alias for proposedPrice
   final String pickupTime;
   final String deliverTime;
+  final String receiveDate; // Alias for pickupTime
+  final String deliverDate; // Alias for deliverTime
   final String shipperName;
+  final String? shipperPhone;
   final DateTime postedAt;
 
   OrderStatus status;
@@ -26,15 +32,21 @@ class PooledOrder {
     required this.type,
     required this.from,
     required this.to,
+    this.fromDetail,
+    this.toDetail,
     required this.goods,
     required this.weight,
     required this.proposedPrice,
     required this.pickupTime,
     required this.deliverTime,
     required this.shipperName,
+    this.shipperPhone,
     this.status = OrderStatus.pending,
     this.hasSeenResult = false,
-  }) : postedAt = DateTime.now();
+  }) : price = proposedPrice,
+       receiveDate = pickupTime,
+       deliverDate = deliverTime,
+       postedAt = DateTime.now();
 }
 
 class OrderPoolService extends ChangeNotifier {
@@ -100,5 +112,10 @@ class OrderPoolService extends ChangeNotifier {
     if (index != -1) {
       _orders[index].hasSeenResult = true;
     }
+  }
+
+  // Static method for easy access
+  static Future<List<PooledOrder>> getAvailableOrders() async {
+    return instance.availableOrders;
   }
 }

@@ -1,9 +1,11 @@
 // lib/features/driver/screens/history_screen.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import 'trip_tracking_screen.dart';
 import '../services/order_status_service.dart';
+import '../services/empty_trip_service.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -35,6 +37,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverId = prefs.getString('user_phone') ?? '';
+
     // Lấy đơn đang chờ
     final waitingOrders = await OrderStatusService.getWaitingOrders();
     final waiting = waitingOrders.map((order) {
@@ -65,10 +70,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
       };
     }).toList();
 
+    // Lấy chế độ GHÉP HÀNG đang giao (delivering)
+    final deliveringTrips = await EmptyTripService.getMyDeliveringTrips(driverId);
+    final delivering = deliveringTrips.map((trip) {
+      return {
+        'id': trip.id,
+        'route': '${trip.from} - ${trip.to}',
+        'cargo': '${trip.joinedShippers.length} chủ hàng',
+        'date': DateTime.now().toString().split(' ')[0],
+        'status': trip.status == 'delivering' ? 'Đang giao hàng' : 'Hoàn thành',
+        'statusColor': trip.status == 'delivering' ? Colors.orange : Colors.green,
+        'price': trip.proposedPrice,
+        'progress': trip.status == 'delivering' ? 1 : 3,
+        'from': trip.from,
+        'to': trip.to,
+      };
+    }).toList();
+
     setState(() {
       waitingTrips = waiting;
       completedTrips = completed;
-      allTrips = [...waiting, ...completed];
+      // Kết hợp tất cả: đang chờ + đang giao (ghép hàng) + đã hoàn thành
+      allTrips = [...waiting, ...delivering, ...completed];
     });
   }
 

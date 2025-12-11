@@ -216,6 +216,7 @@ class AuthService {
         debugPrint('✗ User not found with phone: $phone');
       }
     }
+    debugPrint('✗ Login failed for identifier: $identifier');
     return null;
   }
 
@@ -223,9 +224,9 @@ class AuthService {
   String? _normalizePhone(String input) {
     final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length < 10) return null;
+    if (digits.length == 10 && digits.startsWith('0')) return digits; // Sửa lỗi ở đây
     if (digits.startsWith('84')) return '0${digits.substring(2)}';
     if (digits.startsWith('+84')) return '0${digits.substring(3)}';
-    if (digits.startsWith('0')) return digits;
     return null;
   }
 
@@ -246,6 +247,7 @@ class AuthService {
     await prefs.remove('account_name');
     await prefs.remove('temp_phone');
     await prefs.remove('temp_password');
+    // ⚠️ KHÔNG xóa empty_trips vì đây là dữ liệu GLOBAL (dùng chung cho tất cả users)
     // ⚠️ KHÔNG xóa bidding_orders, waiting_orders, accepted_orders, completed_orders
     // Vì chúng là dữ liệu lâu dài, không phải session data
     // Chỉ xóa khi user thực sự muốn reset
