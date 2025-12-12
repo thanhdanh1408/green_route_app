@@ -248,6 +248,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_role');
     await prefs.remove('user_phone');
+    await prefs.remove('user_name');
     await prefs.remove('name');
     await prefs.remove('phone');
     await prefs.remove('id');
@@ -265,6 +266,50 @@ class AuthService {
     // Vì chúng là dữ liệu lâu dài, không phải session data
     // Chỉ xóa khi user thực sự muốn reset
     debugPrint('Đã đăng xuất và xóa session data');
+  }
+
+  // GET CURRENT USER ID (phone number)
+  Future<String?> getCurrentUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_phone');
+  }
+
+  // GET CURRENT USER ROLE
+  Future<String?> getCurrentUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  // GET CURRENT USER NAME
+  Future<String?> getCurrentUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name') ?? prefs.getString('name');
+  }
+
+  // CHECK IF USER IS LOGGED IN
+  Future<bool> isLoggedIn() async {
+    final prefs = await SharedPreferences.getInstance();
+    final phone = prefs.getString('user_phone');
+    final role = prefs.getString('user_role');
+    return phone != null && role != null;
+  }
+
+  // GET CURRENT USER FULL INFO
+  Future<Map<String, dynamic>?> getCurrentUser() async {
+    final userId = await getCurrentUserId();
+    if (userId == null) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final role = await getCurrentUserRole();
+    final name = await getCurrentUserName();
+
+    return {
+      'userId': userId,
+      'phone': userId,
+      'role': role,
+      'name': name ?? 'N/A',
+      // Add more fields as needed
+    };
   }
 
   // CLEAR ALL DATA (khi user yêu cầu reset)

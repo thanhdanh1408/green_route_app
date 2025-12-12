@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/document_upload_widget.dart';
+import '../../../core/models/verification_document.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -171,6 +173,73 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 24),
+
+            // Document Verification Section
+            const Divider(thickness: 2),
+            const SizedBox(height: 16),
+            
+            const Text(
+              'Tài liệu xác minh',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Upload tài liệu để Admin xác minh. Bạn cần hoàn tất xác minh để có thể nhận đơn hàng.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Document uploads
+            DocumentUploadWidget(
+              userId: phoneController.text,
+              userType: 'driver',
+              documentType: DocumentTypes.idCardFront,
+              documentLabel: 'CCCD/CMND (Mặt trước)',
+              onDocumentChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            
+            DocumentUploadWidget(
+              userId: phoneController.text,
+              userType: 'driver',
+              documentType: DocumentTypes.idCardBack,
+              documentLabel: 'CCCD/CMND (Mặt sau)',
+              onDocumentChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            
+            DocumentUploadWidget(
+              userId: phoneController.text,
+              userType: 'driver',
+              documentType: DocumentTypes.vehicleRegistration,
+              documentLabel: 'Giấy đăng ký xe',
+              onDocumentChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            
+            DocumentUploadWidget(
+              userId: phoneController.text,
+              userType: 'driver',
+              documentType: DocumentTypes.driverLicenseFront,
+              documentLabel: 'Giấy phép lái xe (Mặt trước)',
+              onDocumentChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            
+            DocumentUploadWidget(
+              userId: phoneController.text,
+              userType: 'driver',
+              documentType: DocumentTypes.driverLicenseBack,
+              documentLabel: 'Giấy phép lái xe (Mặt sau)',
+              onDocumentChanged: () => setState(() {}),
             ),
             const SizedBox(height: 24),
 

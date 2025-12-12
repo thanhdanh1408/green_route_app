@@ -138,6 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             final normalizedPhone = identifier == 'admin' ? 'admin' : identifier.replaceAll(RegExp(r'[^0-9]'), '');
                             await prefs.setString('user_phone', normalizedPhone);
                             await prefs.setString('name', user['name'] ?? '');
+                            await prefs.setString('user_name', user['name'] ?? ''); // For AuthService helper
                             await prefs.setString('user_role', user['role'] ?? '');
                             
                             if (mounted) {

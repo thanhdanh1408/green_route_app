@@ -1,11 +1,35 @@
 // lib/features/shipper/screens/find_driver_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/verification_status_banner.dart';
 import '../screens/confirm_booking_screen.dart';
+import '../screens/edit_profile_screen.dart';
 import '../widgets/driver_card.dart';
 
-class FindDriverScreen extends StatelessWidget {
+class FindDriverScreen extends StatefulWidget {
   const FindDriverScreen({Key? key}) : super(key: key);
+
+  @override
+  State<FindDriverScreen> createState() => _FindDriverScreenState();
+}
+
+class _FindDriverScreenState extends State<FindDriverScreen> {
+  String _userId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_phone') ?? '';
+    if (mounted) {
+      setState(() => _userId = userId);
+    }
+  }
 
   final List<Map<String, dynamic>> drivers = const [
     {
@@ -31,6 +55,19 @@ class FindDriverScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Verification status banner
+          if (_userId.isNotEmpty)
+            VerificationStatusBanner(
+              userId: _userId,
+              userType: 'shipper',
+              onTapEditProfile: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                ).then((_) => _loadUserId());
+              },
+            ),
+          
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(

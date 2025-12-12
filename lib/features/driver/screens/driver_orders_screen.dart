@@ -1,18 +1,18 @@
 // lib/features/driver/screens/driver_orders_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/order_pool_service.dart';
+import '../../../core/services/verification_service.dart';
+import '../../../core/widgets/verification_status_banner.dart';
 import '../models/order_model.dart';
 import '../services/order_status_service.dart';
 import '../widgets/bid_bottom_sheet.dart';
 import '../widgets/empty_orders_widget.dart';
 import '../widgets/order_card.dart';
 import 'booking_requests_screen.dart';
-import '../services/order_status_service.dart';
-import '../widgets/bid_bottom_sheet.dart';
-import '../widgets/empty_orders_widget.dart';
-import '../widgets/order_card.dart';
+import 'edit_profile_screen.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
   const DriverOrdersScreen({super.key});
@@ -23,6 +23,9 @@ class DriverOrdersScreen extends StatefulWidget {
 class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   StreamSubscription? _orderUpdateSubscription;
+  final _verificationService = VerificationService();
+  String _userId = '';
+  bool _isVerified = false;
 
   // Dữ liệu cho mỗi tab
   List<PooledOrder> _availableOrders = [];
@@ -38,8 +41,24 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
       _loadAllData(); 
     });
     
+    // Load user ID and verification status
+    _loadUserInfo();
+    
     // Tải dữ liệu lần đầu
     _loadAllData();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_phone') ?? '';
+    final isVerified = await _verificationService.isUserVerified(userId, 'driver');
+    
+    if (mounted) {
+      setState(() {
+        _userId = userId;
+        _isVerified = isVerified;
+      });
+    }
   }
 
   @override
@@ -116,6 +135,19 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
       ),
       body: Column(
         children: [
+        // Verification status banner
+        if (_userId.isNotEmpty)
+          VerificationStatusBanner(
+            userId: _userId,
+            userType: 'driver',
+            onTapEditProfile: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+              ).then((_) => _loadUserInfo());
+            },
+          ),
+        
         Container(
           color: Colors.white,
           child: TabBar(
