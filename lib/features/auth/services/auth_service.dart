@@ -7,6 +7,15 @@ class AuthService {
   static final instance = AuthService._();
 
   final Map<String, Map<String, dynamic>> fakeUsers = {
+    'admin': {
+      'password': 'admin123',
+      'role': 'admin',
+      'hasRole': true,
+      'name': 'Quản trị viên',
+      'bank': 'MBBank',
+      'accountNumber': '888888888888',
+      'accountName': 'QUAN TRI VIEN',
+    },
     '0987654321': {
       'password': '12345678',
       'role': 'driver',
@@ -14,6 +23,9 @@ class AuthService {
       'hasRoute': true,
       'name': 'Nguyễn Văn Nam',
       'address': 'Gia Lai',
+      'vehicleType': 'Xe tải nặng',
+      'licensePlate': '77A-8977',
+      'idNumber': '123456789012',
       'bank': 'Techcombank',
       'accountNumber': '190378291234',
       'accountName': 'NGUYEN VAN NAM',
@@ -27,6 +39,9 @@ class AuthService {
       'hasRoute': true,
       'name': 'Phạm Văn Tuấn',
       'address': 'Gia Lai',
+      'vehicleType': 'Xe tải trung',
+      'licensePlate': '30A-12345',
+      'idNumber': '987654321098',
       'bank': 'Techcombank',
       'accountNumber': '190378291234',
       'accountName': 'PHAM VAN TUAN',
@@ -39,6 +54,7 @@ class AuthService {
       'hasRole': true,
       'name': 'Trần Thị Lan',
       'address': 'Quảng Ngãi',
+      'company': 'Công ty TNHH Vận tải Lan',
       'bank': 'Vietcombank',
       'accountNumber': '0011001934567',
       'accountName': 'TRAN THI LAN',
@@ -50,6 +66,7 @@ class AuthService {
       'hasRole': true,
       'name': 'Phan Thành Danh',
       'address': 'Quy Nhơn',
+      'company': 'Công ty CP Vận tải Bình Định',
       'bank': 'Vietcombank',
       'accountNumber': '0011001934567',
       'accountName': 'PHAN THANH DANH',
@@ -252,12 +269,13 @@ class AuthService {
     final verificationDocuments = prefs.getString('verification_documents');
     debugPrint('🔒 Saved documents before logout: ${verificationDocuments != null ? "YES (${verificationDocuments.length} chars)" : "NO"}');
     
-    // 🔒 PRESERVE user-specific keys before clearing (for admin queries)
+    // 🔒 PRESERVE user-specific keys before clearing (for admin queries and next login)
     final currentUserId = prefs.getString('user_phone');
     Map<String, String> userSpecificStringKeys = {};
+    Map<String, bool> userSpecificBoolKeys = {};
     
     if (currentUserId != null) {
-      // Save all keys that will be queried by admin
+      // Save all STRING keys that will be queried by admin
       final userName = prefs.getString('user_name_$currentUserId');
       final userRole = prefs.getString('user_role_$currentUserId');
       final vehicleTypeUser = prefs.getString('vehicle_type_$currentUserId');
@@ -267,6 +285,8 @@ class AuthService {
       final driverRouteToUser = prefs.getString('driver_route_to_$currentUserId');
       final driverRouteWeightUser = prefs.getString('driver_route_weight_$currentUserId');
       final driverRouteTimeRangeUser = prefs.getString('driver_route_time_range_$currentUserId');
+      final addressUser = prefs.getString('address_$currentUserId');
+      final companyUser = prefs.getString('company_$currentUserId');
       
       if (userName != null) userSpecificStringKeys['user_name_$currentUserId'] = userName;
       if (userRole != null) userSpecificStringKeys['user_role_$currentUserId'] = userRole;
@@ -277,13 +297,17 @@ class AuthService {
       if (driverRouteToUser != null) userSpecificStringKeys['driver_route_to_$currentUserId'] = driverRouteToUser;
       if (driverRouteWeightUser != null) userSpecificStringKeys['driver_route_weight_$currentUserId'] = driverRouteWeightUser;
       if (driverRouteTimeRangeUser != null) userSpecificStringKeys['driver_route_time_range_$currentUserId'] = driverRouteTimeRangeUser;
+      if (addressUser != null) userSpecificStringKeys['address_$currentUserId'] = addressUser;
+      if (companyUser != null) userSpecificStringKeys['company_$currentUserId'] = companyUser;
       
-      debugPrint('🔒 Saved ${userSpecificStringKeys.length} user-specific keys before logout');
+      // 🔒 CRITICAL: Save BOOL keys (driver_has_route is a BOOL!)
+      final driverHasRoute = prefs.getBool('driver_has_route_$currentUserId');
+      if (driverHasRoute != null) userSpecificBoolKeys['driver_has_route_$currentUserId'] = driverHasRoute;
+      
+      debugPrint('🔒 Saved ${userSpecificStringKeys.length} string keys + ${userSpecificBoolKeys.length} bool keys before logout');
     }
     
-    // ⚠️ NOTE: NOT preserving global keys (vehicle_type, license_plate, etc.)
-    // These should be cleared on logout so next user doesn't see previous user's data
-    
+    // ⚠️ Clear global session keys so next user doesn't see previous user's data
     await prefs.remove('user_role');
     await prefs.remove('user_phone');
     await prefs.remove('user_name');
@@ -305,26 +329,31 @@ class AuthService {
     await prefs.remove('driver_route_to');
     await prefs.remove('driver_route_weight');
     await prefs.remove('driver_route_time_range');
+    await prefs.remove('address');
+    await prefs.remove('company');
+    await prefs.remove('license_plate');
     
-    // 🔒 RESTORE verification documents after clear (needed for admin queries of past data)
+    // 🔒 RESTORE verification documents after clear
     if (verificationDocuments != null) {
       await prefs.setString('verification_documents', verificationDocuments);
       debugPrint('🔒 Verification documents RESTORED after logout');
     }
     
-    // 🔒 RESTORE all user-specific keys after clear (needed for admin queries)
+    // 🔒 RESTORE all user-specific STRING keys
     for (final entry in userSpecificStringKeys.entries) {
       await prefs.setString(entry.key, entry.value);
     }
     
-    if (userSpecificStringKeys.isNotEmpty) {
-      debugPrint('🔒 ${userSpecificStringKeys.length} user-specific keys RESTORED after logout');
+    // 🔒 RESTORE all user-specific BOOL keys
+    for (final entry in userSpecificBoolKeys.entries) {
+      await prefs.setBool(entry.key, entry.value);
+    }
+    
+    if (userSpecificStringKeys.isNotEmpty || userSpecificBoolKeys.isNotEmpty) {
+      debugPrint('🔒 ${userSpecificStringKeys.length} string + ${userSpecificBoolKeys.length} bool keys RESTORED after logout');
     }
     
     // ⚠️ KHÔNG xóa empty_trips vì đây là dữ liệu GLOBAL (dùng chung cho tất cả users)
-    // ⚠️ KHÔNG xóa bidding_orders, waiting_orders, accepted_orders, completed_orders
-    // Vì chúng là dữ liệu lâu dài, không phải session data
-    // Chỉ xóa khi user thực sự muốn reset
     debugPrint('🚪 LOGOUT COMPLETED');
   }
 

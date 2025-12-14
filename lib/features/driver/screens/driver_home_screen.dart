@@ -60,10 +60,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     });
   }
 
-  // CÁC TRANG CHÍNH – ĐÃ CẬP NHẬT ĐÚNG THỨ TỰ
-  late final List<Widget> _pages = [
+  // CÁC TRANG CHÍNH – Sử dụng getter để rebuild khi _hasRoute thay đổi
+  List<Widget> get _pages => [
     // Tab 0: Đơn hàng (nếu đã chọn tuyến) hoặc Chọn tuyến
-    _hasRoute ? const DriverOrdersScreen() : const DriverRouteSelectionScreen(),
+    _hasRoute ? const DriverOrdersScreen() : DriverRouteSelectionScreen(
+      onRouteSelected: () {
+        // Sau khi chọn tuyến xong, reload lại
+        _checkRouteStatus();
+      },
+    ),
 
     // Tab 1: Ghép hàng → CHUYẾN CỦA TÀI XẾ
     DriverEmptyTripsScreen(

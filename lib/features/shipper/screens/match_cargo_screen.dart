@@ -375,9 +375,13 @@ class _MatchCargoScreenState extends State<MatchCargoScreen> {
                                         'Giá tham khảo: ${trip.proposedPrice}đ',
                                         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
                                       ),
-                                      Text(
-                                        'Tài xế: ${trip.driverName}',
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      Expanded(
+                                        child: Text(
+                                          'Tài xế: ${trip.driverName}',
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          textAlign: TextAlign.end,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ],
                                   ),

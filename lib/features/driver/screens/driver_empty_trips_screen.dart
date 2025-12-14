@@ -294,7 +294,7 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Lạp đầy chuyến', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Lấp đầy chuyến', style: TextStyle(fontWeight: FontWeight.bold)),
                       Text('${trip.fillPercentage}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                     ],
                   ),

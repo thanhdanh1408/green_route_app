@@ -30,35 +30,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // Hàm điều hướng thông minh
   void _navigateAfterLogin(Map<String, dynamic> user) async {
-  final role = user['role'] as String?;
-  final hasRole = user['hasRole'] as bool? ?? false;
+    final role = user['role'] as String?;
+    final hasRole = user['hasRole'] as bool? ?? false;
 
-  if (role == null || !hasRole) {
-    // LẦN ĐẦU → CHỌN ROLE
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => RoleSelectionScreen(phone: _identifierController.text.trim())),
-      (route) => false,
-    );
-    return;
-  }
+    if (role == null || !hasRole) {
+      // LẦN ĐẦU → CHỌN ROLE
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>
+                RoleSelectionScreen(phone: _identifierController.text.trim())),
+        (route) => false,
+      );
+      return;
+    }
 
-  switch (role) {
-    case 'driver':
-      final destination = user['hasRoute'] == true ? '/driver_home' : '/driver_route_selection';
-      Navigator.pushNamedAndRemoveUntil(context, destination, (route) => false);
-      break;
-    case 'shipper':
-      Navigator.pushNamedAndRemoveUntil(context, '/shipper_home', (route) => false);
-      break;
-    case 'admin':
-      Navigator.pushNamedAndRemoveUntil(context, '/admin_home', (route) => false);
-      break;
-    default:
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vai trò không hợp lệ!')));
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    switch (role) {
+      case 'driver':
+        final destination = user['hasRoute'] == true
+            ? '/driver_home'
+            : '/driver_route_selection';
+        Navigator.pushNamedAndRemoveUntil(
+            context, destination, (route) => false);
+        break;
+      case 'shipper':
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/shipper_home', (route) => false);
+        break;
+      case 'admin':
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/admin_home', (route) => false);
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Vai trò không hợp lệ!')));
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -131,16 +139,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             identifier,
                             password,
                           );
-                          
+
                           if (user != null && mounted) {
                             // Lưu thông tin user vào SharedPreferences
                             final prefs = await SharedPreferences.getInstance();
-                            final normalizedPhone = identifier == 'admin' ? 'admin' : identifier.replaceAll(RegExp(r'[^0-9]'), '');
-                            await prefs.setString('user_phone', normalizedPhone);
+                            final normalizedPhone = identifier == 'admin'
+                                ? 'admin'
+                                : identifier.replaceAll(RegExp(r'[^0-9]'), '');
+                            await prefs.setString(
+                                'user_phone', normalizedPhone);
                             await prefs.setString('name', user['name'] ?? '');
-                            await prefs.setString('user_name', user['name'] ?? ''); // For AuthService helper
-                            await prefs.setString('user_role', user['role'] ?? '');
-                            
+                            await prefs.setString(
+                                'user_name', user['name'] ?? '');
+                            await prefs.setString(
+                                'user_role', user['role'] ?? '');
+
+                            if (normalizedPhone != 'admin') {
+                              // 🔒 ALWAYS save base info to user-specific keys for admin queries
+                              await prefs.setString(
+                                  'user_name_$normalizedPhone',
+                                  user['name'] ?? '');
+                              await prefs.setString(
+                                  'user_role_$normalizedPhone',
+                                  user['role'] ?? '');
+                              debugPrint(
+                                  '✅ Saved base info to user-specific keys for $normalizedPhone');
+
+                              // 🔄 RESTORE existing user data from user-specific keys (if exists from previous session)
+                              final vehicleType = prefs
+                                  .getString('vehicle_type_$normalizedPhone');
+                              final licensePlate = prefs
+                                  .getString('license_plate_$normalizedPhone');
+                              final idNumber =
+                                  prefs.getString('id_number_$normalizedPhone');
+                              final address =
+                                  prefs.getString('address_$normalizedPhone');
+                              final company =
+                                  prefs.getString('company_$normalizedPhone');
+                              final routeFrom = prefs.getString(
+                                  'driver_route_from_$normalizedPhone');
+                              final routeTo = prefs.getString(
+                                  'driver_route_to_$normalizedPhone');
+                              final routeWeight = prefs.getString(
+                                  'driver_route_weight_$normalizedPhone');
+                              final routeTimeRange = prefs.getString(
+                                  'driver_route_time_range_$normalizedPhone');
+                              final hasRoute = prefs
+                                  .getBool('driver_has_route_$normalizedPhone');
+
+                              // Restore to global keys if data exists
+                              if (vehicleType != null)
+                                await prefs.setString(
+                                    'vehicle_type', vehicleType);
+                              if (licensePlate != null)
+                                await prefs.setString(
+                                    'license_plate', licensePlate);
+                              if (idNumber != null)
+                                await prefs.setString('id_number', idNumber);
+                              if (address != null)
+                                await prefs.setString('address', address);
+                              if (company != null)
+                                await prefs.setString('company', company);
+                              if (routeFrom != null) {
+                                await prefs.setString(
+                                    'driver_route_from', routeFrom);
+                                await prefs.setBool('driver_has_route', true);
+                              }
+                              if (routeTo != null)
+                                await prefs.setString(
+                                    'driver_route_to', routeTo);
+                              if (routeWeight != null)
+                                await prefs.setString(
+                                    'driver_route_weight', routeWeight);
+                              if (routeTimeRange != null)
+                                await prefs.setString(
+                                    'driver_route_time_range', routeTimeRange);
+                              if (hasRoute == true)
+                                await prefs.setBool('driver_has_route', true);
+
+                              // 🔒 CRITICAL: Update user object with restored hasRoute so navigation works correctly
+                              if (hasRoute == true) {
+                                user['hasRoute'] = true;
+                                debugPrint(
+                                    '✅ Updated user[hasRoute]=true from restored data');
+                              }
+
+                              debugPrint(
+                                  '🔄 Restored user data from user-specific keys for $normalizedPhone');
+                            }
+
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(

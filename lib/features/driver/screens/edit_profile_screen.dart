@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/document_upload_widget.dart';
 import '../../../core/models/verification_document.dart';
+import '../../auth/services/auth_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -36,14 +37,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('user_phone') ?? '';
     
-    // 🔒 Load ONLY from user-specific keys to prevent data bleeding
-    var userName = _userId.isNotEmpty ? (prefs.getString('user_name_$_userId') ?? '') : '';
+    // 🔒 Load from user-specific keys, fallback to fakeUsers if not found
+    var userName = _userId.isNotEmpty ? prefs.getString('user_name_$_userId') : null;
+    
+    // Fallback to fakeUsers if user-specific key is empty
+    if ((userName == null || userName.isEmpty) && _userId.isNotEmpty) {
+      final fakeUser = AuthService.instance.fakeUsers[_userId];
+      if (fakeUser != null) {
+        userName = fakeUser['name'] as String?;
+      }
+    }
+    
     var vehicleType = _userId.isNotEmpty ? (prefs.getString('vehicle_type_$_userId') ?? '') : '';
     var licensePlate = _userId.isNotEmpty ? (prefs.getString('license_plate_$_userId') ?? '') : '';
     var idNumber = _userId.isNotEmpty ? (prefs.getString('id_number_$_userId') ?? '') : '';
     
     setState(() {
-      nameController.text = userName;
+      nameController.text = userName ?? '';
       phoneController.text = _userId;
       vehicleTypeController.text = vehicleType;
       licensePlateController.text = licensePlate;

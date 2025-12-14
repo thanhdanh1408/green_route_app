@@ -1,4 +1,5 @@
 // lib/core/services/user_management_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import 'verification_service.dart';
@@ -62,15 +63,25 @@ class UserManagementService {
       final prefs = await SharedPreferences.getInstance();
       final authService = AuthService.instance;
       
-      // Try to get from SharedPreferences first (user-specific keys only)
+      debugPrint('🔍 getUserById: $userId');
+      
+      // Try to get from SharedPreferences first (user-specific keys)
       String? name = prefs.getString('user_name_$userId');
       String? role = prefs.getString('user_role_$userId');
+      
+      debugPrint('🔍 user_name_$userId = $name, user_role_$userId = $role');
       
       // If not in SharedPreferences, check fake users
       if (authService.fakeUsers.containsKey(userId)) {
         final fakeUser = authService.fakeUsers[userId]!;
-        name ??= fakeUser['name'] as String?;
-        role ??= fakeUser['role'] as String?;
+        if (name == null || name.isEmpty) {
+          name = fakeUser['name'] as String?;
+          debugPrint('🔍 Fallback to fakeUsers name = $name');
+        }
+        if (role == null || role.isEmpty) {
+          role = fakeUser['role'] as String?;
+          debugPrint('🔍 Fallback to fakeUsers role = $role');
+        }
       }
       
       // Default role for users without role
@@ -100,10 +111,26 @@ class UserManagementService {
         licensePlate = prefs.getString('license_plate_$userId');
         idNumber = prefs.getString('id_number_$userId');
         hasRoute = prefs.getBool('driver_has_route_$userId'); // Check user-specific key only (preserved from logout)
+        
+        // 🔄 Fallback to fakeUsers if not in SharedPreferences
+        if (authService.fakeUsers.containsKey(userId)) {
+          final fakeUser = authService.fakeUsers[userId]!;
+          vehicleType ??= fakeUser['vehicleType'] as String?;
+          licensePlate ??= fakeUser['licensePlate'] as String?;
+          idNumber ??= fakeUser['idNumber'] as String?;
+          hasRoute ??= fakeUser['hasRoute'] as bool?;
+        }
       } else if (userType == 'shipper') {
         // Load from user-specific keys ONLY
         address = prefs.getString('address_$userId');
         company = prefs.getString('company_$userId');
+        
+        // 🔄 Fallback to fakeUsers if not in SharedPreferences
+        if (authService.fakeUsers.containsKey(userId)) {
+          final fakeUser = authService.fakeUsers[userId]!;
+          address ??= fakeUser['address'] as String?;
+          company ??= fakeUser['company'] as String?;
+        }
       }
 
       // TODO: Get order count and rating from order/rating services

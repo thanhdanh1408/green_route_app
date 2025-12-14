@@ -6,7 +6,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 
 class DriverRouteSelectionScreen extends StatefulWidget {
-  const DriverRouteSelectionScreen({super.key});
+  final VoidCallback? onRouteSelected;
+  
+  const DriverRouteSelectionScreen({super.key, this.onRouteSelected});
 
   @override
   State<DriverRouteSelectionScreen> createState() => _DriverRouteSelectionScreenState();
@@ -105,7 +107,12 @@ class _DriverRouteSelectionScreenState extends State<DriverRouteSelectionScreen>
               onPressed: _canContinue
                   ? () async {
                       await _saveRoute();
-                      Navigator.pushNamedAndRemoveUntil(context, '/driver_home', (route) => false);
+                      // Gọi callback nếu có (để refresh parent)
+                      widget.onRouteSelected?.call();
+                      // Nếu không có callback, navigate về home
+                      if (widget.onRouteSelected == null && mounted) {
+                        Navigator.pushNamedAndRemoveUntil(context, '/driver_home', (route) => false);
+                      }
                     }
                   : null,
             ),

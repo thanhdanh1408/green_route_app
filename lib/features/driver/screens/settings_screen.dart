@@ -46,21 +46,60 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_phone') ?? '';
     
+    debugPrint('🔍 Settings _loadUserInfo: userId=$userId');
+    
     if (mounted) {
-      // 🔒 Load ONLY from user-specific keys to prevent data bleeding
-      var loadedUserName = userId.isNotEmpty ? (prefs.getString('user_name_$userId') ?? 'Người dùng') : 'Người dùng';
-      var loadedVehicleType = userId.isNotEmpty ? (prefs.getString('vehicle_type_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
-      var loadedLicensePlate = userId.isNotEmpty ? (prefs.getString('license_plate_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
-      var loadedIdNumber = userId.isNotEmpty ? (prefs.getString('id_number_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
+      // 🔒 Load from user-specific keys first
+      var loadedUserName = userId.isNotEmpty ? prefs.getString('user_name_$userId') : null;
+      debugPrint('🔍 user_name_$userId = $loadedUserName');
+      
+      // Fallback to global key
+      if ((loadedUserName == null || loadedUserName.isEmpty)) {
+        loadedUserName = prefs.getString('user_name');
+        debugPrint('🔍 Fallback to global user_name = $loadedUserName');
+      }
+      
+      // Fallback to fakeUsers if still empty
+      if ((loadedUserName == null || loadedUserName.isEmpty) && userId.isNotEmpty) {
+        final fakeUser = AuthService.instance.fakeUsers[userId];
+        if (fakeUser != null) {
+          loadedUserName = fakeUser['name'] as String?;
+          debugPrint('🔍 Fallback to fakeUsers = $loadedUserName');
+        }
+      }
+      
+      // Load vehicle data with fallback chain
+      var loadedVehicleType = userId.isNotEmpty ? prefs.getString('vehicle_type_$userId') : null;
+      loadedVehicleType ??= prefs.getString('vehicle_type');
+      if ((loadedVehicleType == null || loadedVehicleType.isEmpty) && userId.isNotEmpty) {
+        final fakeUser = AuthService.instance.fakeUsers[userId];
+        loadedVehicleType = fakeUser?['vehicleType'] as String?;
+      }
+      
+      var loadedLicensePlate = userId.isNotEmpty ? prefs.getString('license_plate_$userId') : null;
+      loadedLicensePlate ??= prefs.getString('license_plate');
+      if ((loadedLicensePlate == null || loadedLicensePlate.isEmpty) && userId.isNotEmpty) {
+        final fakeUser = AuthService.instance.fakeUsers[userId];
+        loadedLicensePlate = fakeUser?['licensePlate'] as String?;
+      }
+      
+      var loadedIdNumber = userId.isNotEmpty ? prefs.getString('id_number_$userId') : null;
+      loadedIdNumber ??= prefs.getString('id_number');
+      if ((loadedIdNumber == null || loadedIdNumber.isEmpty) && userId.isNotEmpty) {
+        final fakeUser = AuthService.instance.fakeUsers[userId];
+        loadedIdNumber = fakeUser?['idNumber'] as String?;
+      }
       
       setState(() {
-        userName = loadedUserName;
+        userName = loadedUserName ?? 'Người dùng';
         userPhone = userId;
-        vehicleType = loadedVehicleType;
-        licensePlate = loadedLicensePlate;
-        idNumber = loadedIdNumber;
+        vehicleType = loadedVehicleType ?? 'Chưa cập nhật';
+        licensePlate = loadedLicensePlate ?? 'Chưa cập nhật';
+        idNumber = loadedIdNumber ?? 'Chưa cập nhật';
         notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       });
+      
+      debugPrint('✅ Settings loaded: userName=$userName, vehicleType=$vehicleType, licensePlate=$licensePlate');
     }
   }
 

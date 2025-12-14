@@ -35,8 +35,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     });
   }
 
-  Future<void> _handleLogout(BuildContext context) async {
-    if (_isLoggingOut) return; // Prevent double logout
+  Future<void> _handleLogout() async {
+    if (_isLoggingOut) return;
     
     setState(() => _isLoggingOut = true);
     
@@ -44,7 +44,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await AuthService.instance.logout();
       
       if (mounted) {
-        // Navigate away after successful logout
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -52,12 +51,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         );
       }
     } catch (e) {
-      // Show error before widget might be deactivated
-      if (mounted && Navigator.canPop(context)) {
+      debugPrint('Logout error: $e');
+      if (mounted) {
+        setState(() => _isLoggingOut = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Lỗi đăng xuất: $e')),
         );
-        setState(() => _isLoggingOut = false);
       }
     }
   }
@@ -65,8 +64,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierDismissible: !_isLoggingOut, // Can't dismiss while logging out
-      builder: (context) => AlertDialog(
+      barrierDismissible: !_isLoggingOut,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Đăng xuất'),
         content: _isLoggingOut 
             ? const Row(
@@ -84,13 +83,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         actions: [
           if (!_isLoggingOut)
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Hủy'),
             ),
           ElevatedButton(
             onPressed: _isLoggingOut ? null : () {
-              Navigator.pop(context); // Close dialog first
-              _handleLogout(context); // Then handle logout
+              Navigator.pop(dialogContext); // Close dialog
+              _handleLogout(); // Logout using screen context
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
