@@ -233,6 +233,13 @@ class _RegisterDriverScreenState extends State<RegisterDriverScreen> {
                     await prefs.setString('id_status', 'pending');
                     await prefs.setString('license_status', 'pending');
                     
+                    // 🔒 Lưu vào user-specific keys để admin có thể query
+                    await prefs.setString('user_name_$_phone', _nameController.text.trim());
+                    await prefs.setString('user_role_$_phone', 'driver');
+                    await prefs.setString('vehicle_type_$_phone', _vehicleTypeController.text.trim());
+                    await prefs.setString('license_plate_$_phone', _plateController.text.trim().toUpperCase());
+                    await prefs.setString('id_number_$_phone', '');
+                    
                     // Xóa dữ liệu tạm thời
                     await prefs.remove('temp_phone');
                     await prefs.remove('temp_password');

@@ -94,13 +94,16 @@ class UserManagementService {
       String? company;
 
       if (userType == 'driver') {
-        vehicleType = prefs.getString('vehicle_type_$userId') ?? prefs.getString('vehicle_type');
-        licensePlate = prefs.getString('license_plate_$userId') ?? prefs.getString('license_plate');
-        idNumber = prefs.getString('id_number_$userId') ?? prefs.getString('id_number');
-        hasRoute = prefs.getBool('driver_has_route_$userId') ?? prefs.getBool('driver_has_route');
+        // Load from user-specific keys ONLY (not from global session keys)
+        // This prevents data bleeding between different users
+        vehicleType = prefs.getString('vehicle_type_$userId');
+        licensePlate = prefs.getString('license_plate_$userId');
+        idNumber = prefs.getString('id_number_$userId');
+        hasRoute = prefs.getBool('driver_has_route_$userId'); // Check user-specific key only (preserved from logout)
       } else if (userType == 'shipper') {
-        address = prefs.getString('address_$userId') ?? prefs.getString('address');
-        company = prefs.getString('company_$userId') ?? prefs.getString('company');
+        // Load from user-specific keys ONLY
+        address = prefs.getString('address_$userId');
+        company = prefs.getString('company_$userId');
       }
 
       // TODO: Get order count and rating from order/rating services

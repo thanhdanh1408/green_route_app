@@ -29,7 +29,7 @@ class AuthService {
       'address': 'Gia Lai',
       'bank': 'Techcombank',
       'accountNumber': '190378291234',
-      'accountName': 'NGUYEN VAN NAM',
+      'accountName': 'PHAM VAN TUAN',
       'idStatus': 'approved',
       'licenseStatus': 'approved',
     },
@@ -252,6 +252,38 @@ class AuthService {
     final verificationDocuments = prefs.getString('verification_documents');
     debugPrint('🔒 Saved documents before logout: ${verificationDocuments != null ? "YES (${verificationDocuments.length} chars)" : "NO"}');
     
+    // 🔒 PRESERVE user-specific keys before clearing (for admin queries)
+    final currentUserId = prefs.getString('user_phone');
+    Map<String, String> userSpecificStringKeys = {};
+    
+    if (currentUserId != null) {
+      // Save all keys that will be queried by admin
+      final userName = prefs.getString('user_name_$currentUserId');
+      final userRole = prefs.getString('user_role_$currentUserId');
+      final vehicleTypeUser = prefs.getString('vehicle_type_$currentUserId');
+      final licensePlateUser = prefs.getString('license_plate_$currentUserId');
+      final idNumberUser = prefs.getString('id_number_$currentUserId');
+      final driverRouteFromUser = prefs.getString('driver_route_from_$currentUserId');
+      final driverRouteToUser = prefs.getString('driver_route_to_$currentUserId');
+      final driverRouteWeightUser = prefs.getString('driver_route_weight_$currentUserId');
+      final driverRouteTimeRangeUser = prefs.getString('driver_route_time_range_$currentUserId');
+      
+      if (userName != null) userSpecificStringKeys['user_name_$currentUserId'] = userName;
+      if (userRole != null) userSpecificStringKeys['user_role_$currentUserId'] = userRole;
+      if (vehicleTypeUser != null) userSpecificStringKeys['vehicle_type_$currentUserId'] = vehicleTypeUser;
+      if (licensePlateUser != null) userSpecificStringKeys['license_plate_$currentUserId'] = licensePlateUser;
+      if (idNumberUser != null) userSpecificStringKeys['id_number_$currentUserId'] = idNumberUser;
+      if (driverRouteFromUser != null) userSpecificStringKeys['driver_route_from_$currentUserId'] = driverRouteFromUser;
+      if (driverRouteToUser != null) userSpecificStringKeys['driver_route_to_$currentUserId'] = driverRouteToUser;
+      if (driverRouteWeightUser != null) userSpecificStringKeys['driver_route_weight_$currentUserId'] = driverRouteWeightUser;
+      if (driverRouteTimeRangeUser != null) userSpecificStringKeys['driver_route_time_range_$currentUserId'] = driverRouteTimeRangeUser;
+      
+      debugPrint('🔒 Saved ${userSpecificStringKeys.length} user-specific keys before logout');
+    }
+    
+    // ⚠️ NOTE: NOT preserving global keys (vehicle_type, license_plate, etc.)
+    // These should be cleared on logout so next user doesn't see previous user's data
+    
     await prefs.remove('user_role');
     await prefs.remove('user_phone');
     await prefs.remove('user_name');
@@ -262,18 +294,31 @@ class AuthService {
     await prefs.remove('vehicle_type');
     await prefs.remove('capacity');
     await prefs.remove('area');
+    await prefs.remove('id_number');
     await prefs.remove('bank');
     await prefs.remove('account');
     await prefs.remove('account_name');
     await prefs.remove('temp_phone');
     await prefs.remove('temp_password');
+    await prefs.remove('driver_has_route');
+    await prefs.remove('driver_route_from');
+    await prefs.remove('driver_route_to');
+    await prefs.remove('driver_route_weight');
+    await prefs.remove('driver_route_time_range');
     
-    // 🔒 RESTORE verification documents after clearing session data
+    // 🔒 RESTORE verification documents after clear (needed for admin queries of past data)
     if (verificationDocuments != null) {
       await prefs.setString('verification_documents', verificationDocuments);
       debugPrint('🔒 Verification documents RESTORED after logout');
-    } else {
-      debugPrint('❌ NO documents to restore - they were already deleted!');
+    }
+    
+    // 🔒 RESTORE all user-specific keys after clear (needed for admin queries)
+    for (final entry in userSpecificStringKeys.entries) {
+      await prefs.setString(entry.key, entry.value);
+    }
+    
+    if (userSpecificStringKeys.isNotEmpty) {
+      debugPrint('🔒 ${userSpecificStringKeys.length} user-specific keys RESTORED after logout');
     }
     
     // ⚠️ KHÔNG xóa empty_trips vì đây là dữ liệu GLOBAL (dùng chung cho tất cả users)

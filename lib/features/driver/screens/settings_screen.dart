@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/verification_service.dart';
+import '../../../features/auth/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -12,24 +14,54 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   String userName = '';
   String userPhone = '';
+  String vehicleType = '';
+  String licensePlate = '';
+  String idNumber = '';
   bool notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserInfo();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadUserInfo();
+    }
   }
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userName = prefs.getString('user_name') ?? 'Người dùng';
-      userPhone = prefs.getString('user_phone') ?? '';
-      notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
-    });
+    final userId = prefs.getString('user_phone') ?? '';
+    
+    if (mounted) {
+      // 🔒 Load ONLY from user-specific keys to prevent data bleeding
+      var loadedUserName = userId.isNotEmpty ? (prefs.getString('user_name_$userId') ?? 'Người dùng') : 'Người dùng';
+      var loadedVehicleType = userId.isNotEmpty ? (prefs.getString('vehicle_type_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
+      var loadedLicensePlate = userId.isNotEmpty ? (prefs.getString('license_plate_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
+      var loadedIdNumber = userId.isNotEmpty ? (prefs.getString('id_number_$userId') ?? 'Chưa cập nhật') : 'Chưa cập nhật';
+      
+      setState(() {
+        userName = loadedUserName;
+        userPhone = userId;
+        vehicleType = loadedVehicleType;
+        licensePlate = loadedLicensePlate;
+        idNumber = loadedIdNumber;
+        notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      });
+    }
   }
 
   Future<void> _toggleNotifications(bool value) async {
@@ -122,19 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              
-              // 🔒 PRESERVE verification documents before clearing
-              final verificationDocuments = prefs.getString('verification_documents');
-              debugPrint('🔒 Driver logout: Saved documents before clear');
-              
-              await prefs.clear();
-              
-              // 🔒 RESTORE verification documents after clear
-              if (verificationDocuments != null) {
-                await prefs.setString('verification_documents', verificationDocuments);
-                debugPrint('🔒 Driver logout: Restored documents after clear');
-              }
+              await AuthService.instance.logout();
               
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
@@ -203,6 +223,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          _SectionHeader(title: 'Thông tin tài xế'),
+          _SettingsTile(icon: Icons.local_shipping, title: 'Loại xe', trailing: Text(vehicleType), onTap: () {}),
+          _SettingsTile(icon: Icons.directions_car, title: 'Biển số xe', trailing: Text(licensePlate), onTap: () {}),
+          _SettingsTile(icon: Icons.badge, title: 'CCCD/CMND', trailing: Text(idNumber), onTap: () {}),
+          const SizedBox(height: 8),
           _SectionHeader(title: 'Tài khoản'),
           _SettingsTile(icon: Icons.lock_outline, title: 'Đổi mật khẩu', onTap: _showChangePasswordDialog),
           _SettingsTile(
@@ -234,6 +259,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             },
           ),
+          _VerificationDocumentsWidget(userId: userPhone),
           const SizedBox(height: 8),
           _SectionHeader(title: 'Thông báo'),
           SwitchListTile(
@@ -306,6 +332,159 @@ class _SettingsTile extends StatelessWidget {
       title: Text(title),
       trailing: trailing ?? const Icon(Icons.chevron_right),
       onTap: onTap,
+    );
+  }
+}
+
+class _VerificationDocumentsWidget extends StatefulWidget {
+  final String userId;
+
+  const _VerificationDocumentsWidget({required this.userId});
+
+  @override
+  State<_VerificationDocumentsWidget> createState() => _VerificationDocumentsWidgetState();
+}
+
+class _VerificationDocumentsWidgetState extends State<_VerificationDocumentsWidget> with WidgetsBindingObserver {
+  final _verificationService = VerificationService();
+  Map<String, dynamic>? _status;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadStatus();
+    }
+  }
+
+  Future<void> _loadStatus() async {
+    if (widget.userId.isEmpty) return;
+    
+    setState(() => _isLoading = true);
+    final status = await _verificationService.getUserVerificationStatus(
+      widget.userId,
+      'driver',
+    );
+    setState(() {
+      _status = status;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || _status == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    final approvedCount = _status!['approvedCount'] as int;
+    final pendingCount = _status!['pendingCount'] as int;
+    final rejectedCount = _status!['rejectedCount'] as int;
+    final totalRequired = _status!['totalRequired'] as int;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trạng thái xác minh tài liệu',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _DocumentStatusBadge(
+                icon: Icons.check_circle,
+                label: 'Đã duyệt',
+                count: approvedCount,
+                color: Colors.green,
+              ),
+              _DocumentStatusBadge(
+                icon: Icons.pending,
+                label: 'Chờ duyệt',
+                count: pendingCount,
+                color: Colors.orange,
+              ),
+              _DocumentStatusBadge(
+                icon: Icons.cancel,
+                label: 'Bị từ chối',
+                count: rejectedCount,
+                color: Colors.red,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.center,
+            child: Text(
+              'Tổng: $approvedCount + $pendingCount + $rejectedCount / $totalRequired',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocumentStatusBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color color;
+
+  const _DocumentStatusBadge({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 4),
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

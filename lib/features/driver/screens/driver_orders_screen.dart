@@ -11,6 +11,7 @@ import '../widgets/bid_bottom_sheet.dart';
 import '../widgets/empty_orders_widget.dart';
 import '../widgets/order_card.dart';
 import 'booking_requests_screen.dart';
+import 'driver_route_selection_screen.dart';
 import 'edit_profile_screen.dart';
 
 class DriverOrdersScreen extends StatefulWidget {
@@ -108,6 +109,24 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
     );
   }
 
+  void _handleEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+    );
+    
+    // If changes were saved, trigger rebuild to refresh verification banner
+    if (result == true && mounted) {
+      // Wait a bit for documents to be saved to SharedPreferences
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      // Trigger rebuild of the entire screen to refresh the banner
+      setState(() {});
+      
+      debugPrint('✅ Refreshed screen after edit profile');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,47 +149,138 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
       ),
       body: Column(
         children: [
-        // Verification status banner
-        if (_userId.isNotEmpty)
-          VerificationStatusBanner(
-            userId: _userId,
-            userType: 'driver',
-            onTapEditProfile: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-              ).then((_) => _loadUserInfo());
-            },
+          // Verification status banner
+          if (_userId.isNotEmpty)
+            VerificationStatusBanner(
+              userId: _userId,
+              userType: 'driver',
+              onTapEditProfile: _handleEditProfile,
+            ),
+          
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: AppColors.primary,
+              tabs: [
+                _buildTab('Đề xuất', _availableOrders.length),
+                _buildTab('Đang đấu thầu', _biddingOrders.length),
+              ],
+            ),
           ),
-        
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: Colors.grey[600],
-            indicatorColor: AppColors.primary,
-            tabs: [
-              _buildTab('Đề xuất', _availableOrders.length),
-              _buildTab('Đang đấu thầu', _biddingOrders.length),
-            ],
+          
+          // Route info card - displayed below tabs
+          _buildRouteCard(),
+          
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: Đề xuất - Available orders from pool
+                _buildAvailableOrdersList(),
+                
+                // Tab 2: Đang đấu thầu - Pending bids
+                _buildBiddingOrdersList(),
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Tab 1: Đề xuất - Available orders from pool
-              _buildAvailableOrdersList(),
-              
-              // Tab 2: Đang đấu thầu - Pending bids
-              _buildBiddingOrdersList(),
-            ],
-          ),
-        ),
-      ],
+        ],
       ),
     );
+  }
+
+  Widget _buildRouteCard() {
+    // Load route info from SharedPreferences
+    return FutureBuilder<Map<String, String>>(
+      future: _loadRouteInfo(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+        
+        final routeFrom = snapshot.data!['from'] ?? '';
+        final routeTo = snapshot.data!['to'] ?? '';
+        final routeWeight = snapshot.data!['weight'] ?? '';
+        final routeTimeRange = snapshot.data!['timeRange'] ?? '';
+        
+        if (routeFrom.isEmpty || routeTo.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        
+        return Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tuyến hoạt động',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        Text(
+                          '$routeFrom → $routeTo',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const DriverRouteSelectionScreen()),
+                      );
+                    },
+                    child: const Text('Đổi'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.fitness_center, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text('$routeWeight tấn', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                  const SizedBox(width: 16),
+                  Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(routeTimeRange, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Future<Map<String, String>> _loadRouteInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'from': prefs.getString('driver_route_from') ?? '',
+      'to': prefs.getString('driver_route_to') ?? '',
+      'weight': prefs.getString('driver_route_weight') ?? '',
+      'timeRange': prefs.getString('driver_route_time_range') ?? '',
+    };
   }
 
   Widget _buildTab(String text, int count) {

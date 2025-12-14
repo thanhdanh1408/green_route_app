@@ -40,6 +40,15 @@ class _DocumentUploadWidgetState extends State<DocumentUploadWidget> {
     _loadDocument();
   }
 
+  @override
+  void didUpdateWidget(DocumentUploadWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload document if userId changed
+    if (oldWidget.userId != widget.userId) {
+      _loadDocument();
+    }
+  }
+
   Future<void> _loadDocument() async {
     setState(() => _isLoading = true);
     final doc = await _verificationService.getUserDocumentByType(

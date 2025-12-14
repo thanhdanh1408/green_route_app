@@ -19,6 +19,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController vehicleTypeController;
   late TextEditingController licensePlateController;
   late TextEditingController idNumberController;
+  String _userId = '';
 
   @override
   void initState() {
@@ -33,23 +34,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    _userId = prefs.getString('user_phone') ?? '';
+    
+    // 🔒 Load ONLY from user-specific keys to prevent data bleeding
+    var userName = _userId.isNotEmpty ? (prefs.getString('user_name_$_userId') ?? '') : '';
+    var vehicleType = _userId.isNotEmpty ? (prefs.getString('vehicle_type_$_userId') ?? '') : '';
+    var licensePlate = _userId.isNotEmpty ? (prefs.getString('license_plate_$_userId') ?? '') : '';
+    var idNumber = _userId.isNotEmpty ? (prefs.getString('id_number_$_userId') ?? '') : '';
+    
     setState(() {
-      nameController.text = prefs.getString('user_name') ?? '';
-      phoneController.text = prefs.getString('user_phone') ?? '';
-      vehicleTypeController.text = prefs.getString('vehicle_type') ?? '';
-      licensePlateController.text = prefs.getString('license_plate') ?? '';
-      idNumberController.text = prefs.getString('id_number') ?? '';
+      nameController.text = userName;
+      phoneController.text = _userId;
+      vehicleTypeController.text = vehicleType;
+      licensePlateController.text = licensePlate;
+      idNumberController.text = idNumber;
     });
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_phone') ?? '';
+      
+      // Lưu vào SharedPreferences (cả global và user-specific keys)
       await prefs.setString('user_name', nameController.text.trim());
-      // Phone is read-only for security
       await prefs.setString('vehicle_type', vehicleTypeController.text.trim());
       await prefs.setString('license_plate', licensePlateController.text.trim().toUpperCase());
       await prefs.setString('id_number', idNumberController.text.trim());
+      
+      // 🔒 Lưu vào user-specific keys để admin có thể query
+      if (userId.isNotEmpty) {
+        await prefs.setString('user_name_$userId', nameController.text.trim());
+        await prefs.setString('vehicle_type_$userId', vehicleTypeController.text.trim());
+        await prefs.setString('license_plate_$userId', licensePlateController.text.trim().toUpperCase());
+        await prefs.setString('id_number_$userId', idNumberController.text.trim());
+        debugPrint('✅ Saved profile to user-specific keys for admin query');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,7 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             // Document uploads
             DocumentUploadWidget(
-              userId: phoneController.text,
+              userId: _userId,
               userType: 'driver',
               documentType: DocumentTypes.idCardFront,
               documentLabel: 'CCCD/CMND (Mặt trước)',
@@ -208,7 +228,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             
             DocumentUploadWidget(
-              userId: phoneController.text,
+              userId: _userId,
               userType: 'driver',
               documentType: DocumentTypes.idCardBack,
               documentLabel: 'CCCD/CMND (Mặt sau)',
@@ -217,7 +237,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             
             DocumentUploadWidget(
-              userId: phoneController.text,
+              userId: _userId,
               userType: 'driver',
               documentType: DocumentTypes.vehicleRegistration,
               documentLabel: 'Giấy đăng ký xe',
@@ -226,7 +246,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             
             DocumentUploadWidget(
-              userId: phoneController.text,
+              userId: _userId,
               userType: 'driver',
               documentType: DocumentTypes.driverLicenseFront,
               documentLabel: 'Giấy phép lái xe (Mặt trước)',
@@ -235,7 +255,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             
             DocumentUploadWidget(
-              userId: phoneController.text,
+              userId: _userId,
               userType: 'driver',
               documentType: DocumentTypes.driverLicenseBack,
               documentLabel: 'Giấy phép lái xe (Mặt sau)',

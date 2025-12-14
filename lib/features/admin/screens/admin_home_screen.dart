@@ -18,6 +18,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final _verificationService = VerificationService();
   int _pendingCount = 0;
   bool _isLoading = true;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -35,32 +36,61 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _handleLogout(BuildContext context) async {
-    await AuthService.instance.logout();
+    if (_isLoggingOut) return; // Prevent double logout
     
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+    setState(() => _isLoggingOut = true);
+    
+    try {
+      await AuthService.instance.logout();
+      
+      if (mounted) {
+        // Navigate away after successful logout
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // Show error before widget might be deactivated
+      if (mounted && Navigator.canPop(context)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi đăng xuất: $e')),
+        );
+        setState(() => _isLoggingOut = false);
+      }
     }
   }
 
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: !_isLoggingOut, // Can't dismiss while logging out
       builder: (context) => AlertDialog(
         title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        content: _isLoggingOut 
+            ? const Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 16),
+                  Text('Đang đăng xuất...'),
+                ],
+              )
+            : const Text('Bạn có chắc chắn muốn đăng xuất?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
+          if (!_isLoggingOut)
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _handleLogout(context);
+            onPressed: _isLoggingOut ? null : () {
+              Navigator.pop(context); // Close dialog first
+              _handleLogout(context); // Then handle logout
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

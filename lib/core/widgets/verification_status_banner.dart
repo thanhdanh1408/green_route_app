@@ -17,6 +17,14 @@ class VerificationStatusBanner extends StatefulWidget {
 
   @override
   State<VerificationStatusBanner> createState() => _VerificationStatusBannerState();
+
+  // Public method to refresh status from parent widgets
+  static Future<void> refresh(BuildContext context, String userId) async {
+    final state = context.findAncestorStateOfType<_VerificationStatusBannerState>();
+    if (state != null) {
+      await state._loadStatus();
+    }
+  }
 }
 
 class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
@@ -24,13 +32,21 @@ class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
   Map<String, dynamic>? _status;
   bool _isLoading = true;
   bool _isDismissed = false;
-  bool _showBanner = true; // Check if user has dismissed banner
 
   @override
   void initState() {
     super.initState();
     _loadStatus();
     _checkBannerDismissed();
+  }
+
+  @override
+  void didUpdateWidget(VerificationStatusBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload status if userId changed
+    if (oldWidget.userId != widget.userId) {
+      _loadStatus();
+    }
   }
 
   Future<void> _checkBannerDismissed() async {
@@ -63,6 +79,7 @@ class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
       _status = status;
       _isLoading = false;
     });
+    debugPrint('🔄 Verification status reloaded for ${widget.userId}: $status');
   }
 
   @override

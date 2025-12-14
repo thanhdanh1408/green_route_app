@@ -42,15 +42,26 @@ class _DriverRouteSelectionScreenState extends State<DriverRouteSelectionScreen>
 
   Future<void> _saveRoute() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_phone');
+    
+    // Save route to global keys
     await prefs.setBool('driver_has_route', true);
     await prefs.setString('driver_route_from', fromProvince!);
     await prefs.setString('driver_route_to', toProvince!);
+    await prefs.setString('driver_route_weight', weight!);
+    await prefs.setString('driver_route_time_range', timeRange!);
     
-    // Cập nhật hasRoute trong AuthService
-    final userPhone = prefs.getString('user_phone');
-    if (userPhone != null) {
-      debugPrint('Updating hasRoute for user: $userPhone');
+    // 🔒 Also save to user-specific keys for persistence across logouts
+    if (userId != null && userId.isNotEmpty) {
+      await prefs.setString('driver_route_from_$userId', fromProvince!);
+      await prefs.setString('driver_route_to_$userId', toProvince!);
+      await prefs.setString('driver_route_weight_$userId', weight!);
+      await prefs.setString('driver_route_time_range_$userId', timeRange!);
+      await prefs.setBool('driver_has_route_$userId', true);
+      debugPrint('✅ Saved route to user-specific keys for persistence');
     }
+    
+    debugPrint('✅ Route saved: $fromProvince → $toProvince, Weight: $weight, Time: $timeRange');
   }
 
   @override

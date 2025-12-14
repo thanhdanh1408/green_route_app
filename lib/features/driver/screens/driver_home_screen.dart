@@ -30,7 +30,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _checkRouteStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasRoute = prefs.getBool('driver_has_route') ?? false;
+    final userId = prefs.getString('user_phone') ?? '';
+    
+    // Check global keys first (for fresh login without logout history)
+    var hasRoute = prefs.getBool('driver_has_route') ?? false;
+    
+    // If not found in global keys, check user-specific keys (for after logout/login)
+    if (!hasRoute && userId.isNotEmpty) {
+      hasRoute = prefs.getBool('driver_has_route_$userId') ?? false;
+      final routeFrom = prefs.getString('driver_route_from_$userId') ?? '';
+      final routeTo = prefs.getString('driver_route_to_$userId') ?? '';
+      final routeWeight = prefs.getString('driver_route_weight_$userId') ?? '';
+      final routeTimeRange = prefs.getString('driver_route_time_range_$userId') ?? '';
+      
+      // 🔒 If found in user-specific keys, restore to global keys for this session
+      if (hasRoute) {
+        await prefs.setBool('driver_has_route', true);
+        if (routeFrom.isNotEmpty) await prefs.setString('driver_route_from', routeFrom);
+        if (routeTo.isNotEmpty) await prefs.setString('driver_route_to', routeTo);
+        if (routeWeight.isNotEmpty) await prefs.setString('driver_route_weight', routeWeight);
+        if (routeTimeRange.isNotEmpty) await prefs.setString('driver_route_time_range', routeTimeRange);
+        debugPrint('✅ Route restored from user-specific keys: $routeFrom → $routeTo');
+      }
+    }
 
     setState(() {
       _hasRoute = hasRoute;
@@ -71,9 +93,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+      body: Column(
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                IndexedStack(
+                  index: _currentIndex,
+                  children: _pages,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
 
       floatingActionButton: _currentIndex == 1 // Chỉ hiện ở tab Ghép hàng
@@ -114,6 +146,54 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: 'Ví tiền'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Cài đặt'),
+        ],
+      ),
+    );
+  }
+}
+
+// 🔒 Helper widget để hiển thị thông tin tuyến đường
+class _RouteInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _RouteInfoChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
