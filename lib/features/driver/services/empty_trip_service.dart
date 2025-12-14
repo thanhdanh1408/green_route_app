@@ -457,7 +457,21 @@ class EmptyTripService {
   }
 
   static Future<EmptyTrip?> getEmptyTripDetails(String tripId) async {
-    //...
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+      
+      for (var tripJson in tripsJson) {
+        final trip = EmptyTrip.fromJson(jsonDecode(tripJson));
+        if (trip.id == tripId) {
+          return trip;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error getting empty trip details: $e');
+      return null;
+    }
   }
 
   // Complete consolidated trip - mark as completed

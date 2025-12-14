@@ -123,7 +123,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
+              
+              // 🔒 PRESERVE verification documents before clearing
+              final verificationDocuments = prefs.getString('verification_documents');
+              debugPrint('🔒 Driver logout: Saved documents before clear');
+              
               await prefs.clear();
+              
+              // 🔒 RESTORE verification documents after clear
+              if (verificationDocuments != null) {
+                await prefs.setString('verification_documents', verificationDocuments);
+                debugPrint('🔒 Driver logout: Restored documents after clear');
+              }
               
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
@@ -201,6 +212,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Hiện chỉ hỗ trợ Tiếng Việt')),
             ),
+          ),
+          const SizedBox(height: 8),
+          _SectionHeader(title: 'Xác minh'),
+          _SettingsTile(
+            icon: Icons.verified_user,
+            title: 'Xác minh lại tài khoản',
+            onTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              final userId = prefs.getString('user_phone') ?? '';
+              // Xóa flag đã dismiss banner để hiện lại
+              await prefs.remove('verification_banner_dismissed_$userId');
+              
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Banner xác minh sẽ hiển thị lại'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
           ),
           const SizedBox(height: 8),
           _SectionHeader(title: 'Thông báo'),

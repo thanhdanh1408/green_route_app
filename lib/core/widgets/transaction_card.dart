@@ -1,6 +1,5 @@
 // lib/core/widgets/transaction_card.dart
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 import '../services/wallet_service.dart';
 
 class TransactionCard extends StatelessWidget {

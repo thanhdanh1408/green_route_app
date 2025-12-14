@@ -82,19 +82,12 @@ class _DocumentUploadWidgetState extends State<DocumentUploadWidget> {
       // Convert to base64
       final base64Image = base64Encode(imageBytes);
 
-      // Request document number from user
-      final documentNumber = await _showDocumentNumberDialog();
-      if (documentNumber == null || documentNumber.trim().isEmpty) {
-        setState(() => _isUploading = false);
-        return;
-      }
-
-      // Submit document
+      // Submit document (no need to ask for document number)
       final success = await _verificationService.submitDocument(
         userId: widget.userId,
         userType: widget.userType,
         documentType: widget.documentType,
-        documentNumber: documentNumber,
+        documentNumber: '', // Empty documentNumber
         imageBase64: base64Image,
       );
 
@@ -131,38 +124,6 @@ class _DocumentUploadWidgetState extends State<DocumentUploadWidget> {
         );
       }
     }
-  }
-
-  Future<String?> _showDocumentNumberDialog() async {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Nhập số ${widget.documentLabel}'),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'VD: 001234567890',
-            border: const OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(context, controller.text.trim());
-              }
-            },
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showImageSourceDialog() {

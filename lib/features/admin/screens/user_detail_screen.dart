@@ -1,6 +1,5 @@
 // lib/features/admin/screens/user_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/user_management_service.dart';
 import '../../../core/services/verification_service.dart';

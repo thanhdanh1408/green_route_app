@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/verification_service.dart';
-import '../../../core/services/user_management_service.dart';
+import '../../auth/services/auth_service.dart';
+import '../../auth/screens/login_screen.dart';
 import 'pending_verifications_screen.dart';
 import 'approved_documents_screen.dart';
 import 'rejected_documents_screen.dart';
-import 'user_list_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -16,9 +16,7 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final _verificationService = VerificationService();
-  final _userManagementService = UserManagementService();
   int _pendingCount = 0;
-  int _totalUsers = 0;
   bool _isLoading = true;
 
   @override
@@ -30,12 +28,49 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _loadPendingCount() async {
     setState(() => _isLoading = true);
     final count = await _verificationService.getPendingDocumentsCount();
-    final users = await _userManagementService.getAllUsers();
     setState(() {
       _pendingCount = count;
-      _totalUsers = users.length;
       _isLoading = false;
     });
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    await AuthService.instance.logout();
+    
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _handleLogout(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -45,6 +80,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: const Text('Quản lý Admin', style: TextStyle(color: Colors.white)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => _showLogoutDialog(context),
+            tooltip: 'Đăng xuất',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadPendingCount,

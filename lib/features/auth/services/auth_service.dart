@@ -63,7 +63,7 @@ class AuthService {
       'name': 'Người dùng mới',
       'idStatus': 'pending',
     },
-    'admin': {
+    '0797316607': {
       'password': 'admin123',
       'role': 'admin',
       'hasRole': true,
@@ -245,7 +245,13 @@ class AuthService {
 
   // ĐĂNG XUẤT
   Future<void> logout() async {
+    debugPrint('🚪 LOGOUT STARTED');
     final prefs = await SharedPreferences.getInstance();
+    
+    // 🔒 PRESERVE verification documents before clearing session data
+    final verificationDocuments = prefs.getString('verification_documents');
+    debugPrint('🔒 Saved documents before logout: ${verificationDocuments != null ? "YES (${verificationDocuments.length} chars)" : "NO"}');
+    
     await prefs.remove('user_role');
     await prefs.remove('user_phone');
     await prefs.remove('user_name');
@@ -261,11 +267,20 @@ class AuthService {
     await prefs.remove('account_name');
     await prefs.remove('temp_phone');
     await prefs.remove('temp_password');
+    
+    // 🔒 RESTORE verification documents after clearing session data
+    if (verificationDocuments != null) {
+      await prefs.setString('verification_documents', verificationDocuments);
+      debugPrint('🔒 Verification documents RESTORED after logout');
+    } else {
+      debugPrint('❌ NO documents to restore - they were already deleted!');
+    }
+    
     // ⚠️ KHÔNG xóa empty_trips vì đây là dữ liệu GLOBAL (dùng chung cho tất cả users)
     // ⚠️ KHÔNG xóa bidding_orders, waiting_orders, accepted_orders, completed_orders
     // Vì chúng là dữ liệu lâu dài, không phải session data
     // Chỉ xóa khi user thực sự muốn reset
-    debugPrint('Đã đăng xuất và xóa session data');
+    debugPrint('🚪 LOGOUT COMPLETED');
   }
 
   // GET CURRENT USER ID (phone number)
@@ -299,7 +314,6 @@ class AuthService {
     final userId = await getCurrentUserId();
     if (userId == null) return null;
 
-    final prefs = await SharedPreferences.getInstance();
     final role = await getCurrentUserRole();
     final name = await getCurrentUserName();
 

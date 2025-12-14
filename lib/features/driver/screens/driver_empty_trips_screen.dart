@@ -7,7 +7,6 @@ import '../../../core/theme/app_theme.dart';
 import '../models/empty_trip_model.dart';
 import '../services/empty_trip_service.dart';
 import 'create_empty_trip_screen.dart';
-import 'trip_tracking_screen.dart';
 
 class DriverEmptyTripsScreen extends StatefulWidget {
   final VoidCallback? onNeedHistoryTab;

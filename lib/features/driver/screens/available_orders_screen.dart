@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/order_pool_service.dart';
 import '../../driver/services/order_status_service.dart';
+import '../models/order_model.dart';
 
 class DriverAvailableOrdersScreen extends StatelessWidget {
   const DriverAvailableOrdersScreen({super.key});

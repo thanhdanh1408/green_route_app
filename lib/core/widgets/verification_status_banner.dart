@@ -1,5 +1,6 @@
 // lib/core/widgets/verification_status_banner.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/verification_service.dart';
 
 class VerificationStatusBanner extends StatefulWidget {
@@ -23,11 +24,33 @@ class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
   Map<String, dynamic>? _status;
   bool _isLoading = true;
   bool _isDismissed = false;
+  bool _showBanner = true; // Check if user has dismissed banner
 
   @override
   void initState() {
     super.initState();
     _loadStatus();
+    _checkBannerDismissed();
+  }
+
+  Future<void> _checkBannerDismissed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getBool('verification_banner_dismissed_${widget.userId}') ?? false;
+    setState(() {
+      _isDismissed = dismissed;
+    });
+  }
+
+  Future<void> _dismissBanner() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('verification_banner_dismissed_${widget.userId}', true);
+    setState(() => _isDismissed = true);
+  }
+
+  Future<void> _showBannerAgain() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('verification_banner_dismissed_${widget.userId}');
+    setState(() => _isDismissed = false);
   }
 
   Future<void> _loadStatus() async {
@@ -53,7 +76,6 @@ class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
     final approvedCount = _status!['approvedCount'] as int;
     final pendingCount = _status!['pendingCount'] as int;
     final rejectedCount = _status!['rejectedCount'] as int;
-    final needsAttention = _status!['needsAttention'] as bool;
 
     // If fully verified and no banner was dismissed, show success (once)
     if (isVerified) {
@@ -236,6 +258,8 @@ class _VerificationStatusBannerState extends State<VerificationStatusBanner> {
       );
     }
 
+    // If all documents are submitted (pending + approved), banner is dismissed automatically
+    // User won't see the banner unless there's a rejection or they request re-verification
     return const SizedBox.shrink();
   }
 }

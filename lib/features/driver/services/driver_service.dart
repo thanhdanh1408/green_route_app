@@ -24,6 +24,7 @@ class DriverService {
         fromDetail: pooled.from,
         toDetail: pooled.to,
         weight: pooled.weight,
+        goods: pooled.goods,
         price: pooled.proposedPrice,
         receiveDate: pooled.pickupTime,
         deliverDate: pooled.deliverTime,

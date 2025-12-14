@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/order_pool_service.dart';
-import '../../../core/services/verification_service.dart';
 import '../../../core/widgets/verification_status_banner.dart';
+import '../../../core/services/order_pool_service.dart';
 import '../models/order_model.dart';
 import '../services/order_status_service.dart';
 import '../widgets/bid_bottom_sheet.dart';
@@ -23,9 +22,7 @@ class DriverOrdersScreen extends StatefulWidget {
 class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   StreamSubscription? _orderUpdateSubscription;
-  final _verificationService = VerificationService();
   String _userId = '';
-  bool _isVerified = false;
 
   // Dữ liệu cho mỗi tab
   List<PooledOrder> _availableOrders = [];
@@ -51,12 +48,10 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_phone') ?? '';
-    final isVerified = await _verificationService.isUserVerified(userId, 'driver');
     
     if (mounted) {
       setState(() {
         _userId = userId;
-        _isVerified = isVerified;
       });
     }
   }

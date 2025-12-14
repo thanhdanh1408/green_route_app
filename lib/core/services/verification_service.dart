@@ -52,13 +52,16 @@ class VerificationService {
       // Save to SharedPreferences
       final jsonList = documents.map((doc) => doc.toJson()).toList();
       await prefs.setString(_documentsKey, jsonEncode(jsonList));
+      
+      print('📄 Document submitted - userId: $userId, documentType: $documentType');
+      print('📄 Total documents in storage: ${documents.length}');
 
       // Update user verification status
       await _updateUserVerificationStatus(userId, userType);
 
       return true;
     } catch (e) {
-      print('Error submitting document: $e');
+      print('❌ Error submitting document: $e');
       return false;
     }
   }
@@ -70,15 +73,19 @@ class VerificationService {
       final jsonString = prefs.getString(_documentsKey);
       
       if (jsonString == null || jsonString.isEmpty) {
+        print('📄 No documents found in storage');
         return [];
       }
 
       final jsonList = jsonDecode(jsonString) as List;
-      return jsonList
+      final result = jsonList
           .map((json) => VerificationDocument.fromJson(json as Map<String, dynamic>))
           .toList();
+      
+      print('📄 Loaded ${result.length} documents from storage');
+      return result;
     } catch (e) {
-      print('Error getting all documents: $e');
+      print('❌ Error getting all documents: $e');
       return [];
     }
   }
@@ -86,10 +93,16 @@ class VerificationService {
   // Get pending documents (for admin)
   Future<List<VerificationDocument>> getPendingDocuments() async {
     final documents = await getAllDocuments();
-    return documents
+    final pending = documents
         .where((doc) => doc.status == VerificationStatus.pending)
-        .toList()
-      ..sort((a, b) => a.submittedAt.compareTo(b.submittedAt));
+        .toList();
+    print('📋 Pending documents count: ${pending.length}');
+    print('📋 Total documents: ${documents.length}');
+    for (var doc in documents) {
+      print('   - ${doc.userId} (${doc.documentType}): ${doc.status}');
+    }
+    pending.sort((a, b) => a.submittedAt.compareTo(b.submittedAt));
+    return pending;
   }
 
   // Get approved documents (for admin)
