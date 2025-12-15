@@ -289,18 +289,6 @@ class _UserCard extends StatelessWidget {
                           label: user.getStatusText(),
                           color: user.isActive ? Colors.green : Colors.grey,
                         ),
-                        
-                        const Spacer(),
-                        
-                        // Balance
-                        Text(
-                          '${user.walletBalance.toStringAsFixed(0)}đ',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
-                          ),
-                        ),
                       ],
                     ),
                   ],

@@ -308,4 +308,32 @@ class OrderStatusService {
     await prefs.remove(_shipperReceivedBidsKey);
     _orderStreamController.add(null);
   }
+
+  // Get completed orders count for a specific driver
+  static Future<int> getCompletedOrdersCountForDriver(String driverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    int count = 0;
+    for (final s in driverBids) {
+      final bid = jsonDecode(s);
+      if (bid['driverId'] == driverId && bid['status'] == 'completed') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // Get all completed orders for a specific driver
+  static Future<List<OrderModel>> getCompletedOrdersForDriver(String driverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final orders = <OrderModel>[];
+    for (final s in driverBids) {
+      final bid = jsonDecode(s);
+      if (bid['driverId'] == driverId && bid['status'] == 'completed') {
+        orders.add(OrderModel.fromBid(bid));
+      }
+    }
+    return orders;
+  }
 }

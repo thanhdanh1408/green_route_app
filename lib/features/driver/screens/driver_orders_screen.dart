@@ -71,9 +71,16 @@ class _DriverOrdersScreenState extends State<DriverOrdersScreen> with SingleTick
     // Tải đơn đang đấu thầu (pending bids)
     final bidding = await OrderStatusService.getBiddingOrders();
     
+    // Lấy danh sách các đơn đã được chấp nhận hoặc đang giao (để lọc khỏi tab đề xuất)
+    final delivering = await OrderStatusService.getDeliveringOrders();
+    final acceptedOrderIds = delivering.map((o) => o.id).toSet();
+    
+    // Lọc: Chỉ hiển thị các đơn chưa được chấp nhận
+    final filteredAvailable = available.where((order) => !acceptedOrderIds.contains(order.id)).toList();
+    
     if (mounted) {
       setState(() {
-        _availableOrders = available;
+        _availableOrders = filteredAvailable;
         _biddingOrders = bidding;
       });
     }

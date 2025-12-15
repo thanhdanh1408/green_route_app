@@ -5,6 +5,8 @@ import '../models/user_profile.dart';
 import 'verification_service.dart';
 import 'wallet_service.dart';
 import '../../features/auth/services/auth_service.dart';
+import '../../features/driver/services/order_status_service.dart';
+import '../../features/driver/services/empty_trip_service.dart';
 
 class UserManagementService {
   final _verificationService = VerificationService();
@@ -133,9 +135,24 @@ class UserManagementService {
         }
       }
 
-      // TODO: Get order count and rating from order/rating services
-      final totalOrders = 0;
-      final averageRating = null;
+      // Get order count from order services
+      int totalOrders = 0;
+      double? averageRating = null;
+
+      // Count total orders for drivers (đơn thường + đơn ghép)
+      if (userType == 'driver') {
+        try {
+          // Đơn thường
+          final regularOrders = await OrderStatusService.getCompletedOrdersCountForDriver(userId);
+          // Đơn ghép
+          final consolidatedOrders = await EmptyTripService.getCompletedConsolidatedOrdersCountForDriver(userId);
+          totalOrders = regularOrders + consolidatedOrders;
+          debugPrint('📊 Driver $userId: Regular orders=$regularOrders, Consolidated=$consolidatedOrders, Total=$totalOrders');
+        } catch (e) {
+          debugPrint('⚠️ Error getting completed orders: $e');
+        }
+      }
+      // TODO: Count total orders for shippers and get rating from order/rating services
 
       return UserProfile(
         userId: userId,

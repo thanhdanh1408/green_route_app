@@ -521,6 +521,24 @@ class EmptyTripService {
     _tripStreamController.add(null);
   }
 
+  // Get completed consolidated orders count for a specific driver
+  static Future<int> getCompletedConsolidatedOrdersCountForDriver(String driverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
+    int count = 0;
+    for (var tripJson in allTripsJson) {
+      try {
+        final trip = EmptyTrip.fromJson(tripJson);
+        if (trip.driverId == driverId && trip.status == 'completed') {
+          count++;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error parsing trip: $e');
+      }
+    }
+    return count;
+  }
+
   // ========== CLEAR & DEBUG ==========
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
