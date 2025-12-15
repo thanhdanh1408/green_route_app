@@ -1,10 +1,12 @@
 // lib/features/driver/screens/settings_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/verification_service.dart';
 import '../../auth/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../common/screens/terms_and_policies_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -384,14 +386,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsTile(
             icon: Icons.description_outlined,
             title: 'Điều khoản sử dụng',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Xem điều khoản sử dụng'))),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TermsAndPoliciesScreen(
+                  initialTermType: 'shipper_terms',
+                  availableTerms: ['shipper_terms', 'cargo_terms'],
+                ),
+              ),
+            ),
           ),
           _SettingsTile(
             icon: Icons.privacy_tip_outlined,
             title: 'Chính sách bảo mật',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Xem chính sách bảo mật'))),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TermsAndPoliciesScreen(
+                  initialTermType: 'privacy_policy',
+                  availableTerms: ['privacy_policy'],
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           Padding(
@@ -472,6 +488,7 @@ class _ShipperVerificationDocumentsWidgetState
   final _verificationService = VerificationService();
   Map<String, dynamic>? _status;
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -496,24 +513,96 @@ class _ShipperVerificationDocumentsWidgetState
   Future<void> _loadStatus() async {
     if (widget.userId.isEmpty) return;
 
-    setState(() => _isLoading = true);
-    final status = await _verificationService.getUserVerificationStatus(
-      widget.userId,
-      'shipper',
-    );
     setState(() {
-      _status = status;
-      _isLoading = false;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final status = await _verificationService
+          .getUserVerificationStatus(widget.userId, 'shipper')
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('Tải dữ liệu quá lâu'),
+          );
+
+      if (mounted) {
+        setState(() {
+          _status = status;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Không thể tải dữ liệu xác minh';
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _status == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: CircularProgressIndicator(),
+    if (_isLoading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          children: [
+            const SizedBox(
+              height: 40,
+              width: 40,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Đang tải...',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
       );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.red.withOpacity(0.2)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _error!,
+                  style: TextStyle(fontSize: 12, color: Colors.red[700]),
+                ),
+              ),
+              GestureDetector(
+                onTap: _loadStatus,
+                child: Text(
+                  'Thử lại',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.blue[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_status == null) {
+      return const SizedBox.shrink();
     }
 
     final approvedCount = _status!['approvedCount'] as int;

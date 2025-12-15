@@ -380,9 +380,17 @@ class ChatBotService {
       return _generateFAQResponse(userInput);
     }
 
-    // AI path only for complex questions
+    // AI path only for complex questions with timeout
     try {
-      return await _generateAIResponse(userInput);
+      final response = await _generateAIResponse(userInput)
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              debugPrint('⏱️ AI request timeout, fallback to FAQ');
+              return _generateFAQResponse(userInput);
+            },
+          );
+      return response;
     } catch (e) {
       debugPrint('⚠️ AI error, falling back to FAQ: $e');
       return _generateFAQResponse(userInput);

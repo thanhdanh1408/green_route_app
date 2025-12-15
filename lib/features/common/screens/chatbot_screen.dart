@@ -29,24 +29,52 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Future<void> _initializeChat() async {
     setState(() => _isLoading = true);
     
-    // Load chat history
-    await _chatBotService.loadMessageHistory();
-    
-    setState(() {
-      _messages = _chatBotService.messages.isEmpty
-          ? [
+    try {
+      // Load chat history with timeout
+      await _chatBotService.loadMessageHistory().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('⏱️ Load chat history timeout');
+        },
+      );
+      
+      if (mounted) {
+        setState(() {
+          // Create mutable copy of messages
+          if (_chatBotService.messages.isEmpty) {
+            _messages = [
               ChatMessage(
                 id: const Uuid().v4(),
                 text: 'Xin chào! 👋 Tôi là chatbot hỗ trợ Green Route.\n\n🤖 Tôi sử dụng AI để trả lời câu hỏi của bạn một cách thông minh nhất. Nếu bạn có bất kỳ câu hỏi nào về app, hãy hỏi tôi!',
                 isUser: false,
                 timestamp: DateTime.now(),
               )
-            ]
-          : _chatBotService.messages;
-      _isLoading = false;
-    });
+            ];
+          } else {
+            // Make a mutable copy of the unmodifiable list
+            _messages = List.from(_chatBotService.messages);
+          }
+          _isLoading = false;
+        });
 
-    _scrollToBottom();
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('Error initializing chat: $e');
+      if (mounted) {
+        setState(() {
+          _messages = [
+            ChatMessage(
+              id: const Uuid().v4(),
+              text: 'Xin chào! 👋 Tôi là chatbot hỗ trợ Green Route.\n\n🤖 Tôi sử dụng AI để trả lời câu hỏi của bạn một cách thông minh nhất. Nếu bạn có bất kỳ câu hỏi nào về app, hãy hỏi tôi!',
+              isUser: false,
+              timestamp: DateTime.now(),
+            )
+          ];
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _sendMessage(String text) async {
@@ -70,8 +98,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollToBottom();
 
     try {
-      // Generate bot response (with AI or FAQ)
-      final response = await _chatBotService.generateResponse(text);
+      // Generate bot response with timeout
+      final response = await _chatBotService
+          .generateResponse(text)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => 
+                '❌ Chatbot đang bận. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
+          );
       
       final botMessage = ChatMessage(
         id: const Uuid().v4(),
@@ -80,30 +114,35 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         timestamp: DateTime.now(),
       );
 
-      setState(() {
-        _messages.add(botMessage);
-        _isSendingMessage = false;
-      });
+      if (mounted) {
+        setState(() {
+          _messages.add(botMessage);
+          _isSendingMessage = false;
+        });
 
-      // Save history
-      _chatBotService.addMessage(userMessage);
-      _chatBotService.addMessage(botMessage);
-      await _chatBotService.saveMessageHistory();
+        // Save history
+        _chatBotService.addMessage(userMessage);
+        _chatBotService.addMessage(botMessage);
+        await _chatBotService.saveMessageHistory();
 
-      _scrollToBottom();
+        _scrollToBottom();
+      }
     } catch (e) {
       debugPrint('Error generating response: $e');
       final errorMessage = ChatMessage(
         id: const Uuid().v4(),
-        text: '❌ Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.\n\nLỗi: $e',
+        text: '❌ Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.',
         isUser: false,
         timestamp: DateTime.now(),
       );
       
-      setState(() {
-        _messages.add(errorMessage);
-        _isSendingMessage = false;
-      });
+      if (mounted) {
+        setState(() {
+          _messages.add(errorMessage);
+          _isSendingMessage = false;
+        });
+        _scrollToBottom();
+      }
     }
   }
 
