@@ -7,7 +7,7 @@ import '../../common/widgets/chatbot_fab.dart';
 import 'driver_route_selection_screen.dart';
 import 'driver_orders_screen.dart';
 import 'driver_empty_trips_screen.dart';
-import 'create_empty_trip_screen.dart';
+
 import 'wallet_screen.dart';
 import 'settings_screen.dart';
 

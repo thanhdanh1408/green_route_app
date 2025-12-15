@@ -17,6 +17,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final _scrollController = ScrollController();
 
   List<ChatMessage> _messages = [];
+  bool _isLoading = true;
+  bool _isSendingMessage = false;
 
   @override
   void initState() {
@@ -24,21 +26,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _initializeChat();
   }
 
-  void _initializeChat() {
-    // Welcome message
-    final welcomeMessage = ChatMessage(
-      id: const Uuid().v4(),
-      text: 'Xin chào! 👋 Tôi là chatbot hỗ trợ Green Route. Tôi có thể giúp bạn với các câu hỏi về app. Hãy nói cho tôi biết bạn cần gì!',
-      isUser: false,
-      timestamp: DateTime.now(),
-    );
+  Future<void> _initializeChat() async {
+    setState(() => _isLoading = true);
+    
+    // Load chat history
+    await _chatBotService.loadMessageHistory();
+    
     setState(() {
-      _messages = [welcomeMessage];
+      _messages = _chatBotService.messages.isEmpty
+          ? [
+              ChatMessage(
+                id: const Uuid().v4(),
+                text: 'Xin chào! 👋 Tôi là chatbot hỗ trợ Green Route.\n\n🤖 Tôi sử dụng AI để trả lời câu hỏi của bạn một cách thông minh nhất. Nếu bạn có bất kỳ câu hỏi nào về app, hãy hỏi tôi!',
+                isUser: false,
+                timestamp: DateTime.now(),
+              )
+            ]
+          : _chatBotService.messages;
+      _isLoading = false;
     });
+
+    _scrollToBottom();
   }
 
-  void _sendMessage(String text) {
-    if (text.isEmpty) return;
+  Future<void> _sendMessage(String text) async {
+    if (text.isEmpty || _isSendingMessage) return;
+
+    setState(() => _isSendingMessage = true);
 
     // Add user message
     final userMessage = ChatMessage(
@@ -53,11 +67,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
 
     _textController.clear();
+    _scrollToBottom();
 
-    // Simulate bot thinking time
-    Future.delayed(const Duration(milliseconds: 500), () {
-      // Generate bot response
-      final response = _chatBotService.generateResponse(text);
+    try {
+      // Generate bot response (with AI or FAQ)
+      final response = await _chatBotService.generateResponse(text);
+      
       final botMessage = ChatMessage(
         id: const Uuid().v4(),
         text: response,
@@ -67,11 +82,29 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
       setState(() {
         _messages.add(botMessage);
+        _isSendingMessage = false;
       });
 
-      // Scroll to bottom
+      // Save history
+      _chatBotService.addMessage(userMessage);
+      _chatBotService.addMessage(botMessage);
+      await _chatBotService.saveMessageHistory();
+
       _scrollToBottom();
-    });
+    } catch (e) {
+      debugPrint('Error generating response: $e');
+      final errorMessage = ChatMessage(
+        id: const Uuid().v4(),
+        text: '❌ Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.\n\nLỗi: $e',
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
+      
+      setState(() {
+        _messages.add(errorMessage);
+        _isSendingMessage = false;
+      });
+    }
   }
 
   void _scrollToBottom() {
@@ -86,24 +119,74 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     });
   }
 
-  void _clearChat() {
-    showDialog(
+  Future<void> _clearChat() async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xóa chat?'),
-        content: const Text('Bạn chắc chắn muốn xóa tất cả cuộc trò chuyện không?'),
+        title: const Text('Xóa lịch sử chat?'),
+        content: const Text('Bạn chắc chắn muốn xóa tất cả cuộc trò chuyện không? Hành động này không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _chatBotService.clearMessages();
+      await _initializeChat();
+    }
+  }
+
+  Future<void> _setApiKey() async {
+    final controller = TextEditingController();
+    
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thiết lập OpenAI API Key'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Nhập OpenAI API Key để bật chế độ AI thông minh'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'sk-...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _initializeChat();
+            onPressed: () async {
+              if (controller.text.isNotEmpty) {
+                await _chatBotService.setApiKey(controller.text);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✅ API Key đã được lưu')),
+                  );
+                }
+              }
             },
-            child: const Text('Xóa'),
+            child: const Text('Lưu'),
           ),
         ],
       ),
@@ -114,92 +197,195 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trợ lý ảo', style: TextStyle(color: Colors.white)),
+        title: Row(
+          children: [
+            const Text('Trợ lý ảo', style: TextStyle(color: Colors.white)),
+            const SizedBox(width: 8),
+            _chatBotService.useAI
+                ? Tooltip(
+                    message: 'Sử dụng AI (OpenAI)',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '🤖 AI',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                  )
+                : Tooltip(
+                    message: 'Sử dụng FAQ (Cần API Key)',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '📚 FAQ',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                  ),
+          ],
+        ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          if (!_chatBotService.useAI)
+            IconButton(
+              icon: const Icon(Icons.key),
+              onPressed: _setApiKey,
+              tooltip: 'Thiết lập API Key',
+            ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: _clearChat,
-            tooltip: 'Xóa chat',
+            tooltip: 'Xóa lịch sử chat',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Chat messages
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return _buildMessageBubble(message);
-              },
-            ),
-          ),
-
-          // Quick replies
-          if (_messages.isNotEmpty && _messages.last.isUser)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: _chatBotService.getQuickReplies().map((reply) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[200],
-                        foregroundColor: Colors.black87,
-                      ),
-                      onPressed: () => _sendMessage(reply),
-                      child: Text(reply, style: const TextStyle(fontSize: 12)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-          // Input area
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
+                // Chat messages
                 Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: InputDecoration(
-                      hintText: 'Nhập câu hỏi...',
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onSubmitted: _sendMessage,
-                  ),
+                  child: _messages.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Chưa có tin nhắn',
+                            style: TextStyle(color: Colors.grey[400]),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            return _buildMessageBubble(message);
+                          },
+                        ),
                 ),
-                const SizedBox(width: 8),
-                FloatingActionButton(
-                  mini: true,
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  onPressed: () => _sendMessage(_textController.text),
-                  child: const Icon(Icons.send),
+
+                // Typing indicator
+                if (_isSendingMessage)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Quick replies
+                if (_messages.isNotEmpty && !_isSendingMessage)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: _chatBotService.getQuickReplies().map((reply) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[200],
+                              foregroundColor: Colors.black87,
+                            ),
+                            onPressed: () => _sendMessage(reply),
+                            child: Text(
+                              reply,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                // Input area
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          enabled: !_isSendingMessage,
+                          decoration: InputDecoration(
+                            hintText: 'Nhập câu hỏi...',
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          onSubmitted: _sendMessage,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FloatingActionButton(
+                        mini: true,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        onPressed: _isSendingMessage
+                            ? null
+                            : () => _sendMessage(_textController.text),
+                        child: _isSendingMessage
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.send),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -221,6 +407,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           style: TextStyle(
             color: message.isUser ? Colors.white : Colors.black87,
             fontSize: 14,
+            height: 1.4,
           ),
         ),
       ),
