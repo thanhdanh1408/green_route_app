@@ -93,9 +93,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       setState(() {
         userName = loadedUserName ?? 'Người dùng';
         userPhone = userId;
-        vehicleType = loadedVehicleType ?? 'Chưa cập nhật';
-        licensePlate = loadedLicensePlate ?? 'Chưa cập nhật';
-        idNumber = loadedIdNumber ?? 'Chưa cập nhật';
+        vehicleType = loadedVehicleType ?? '[Chờ duyệt]';
+        licensePlate = loadedLicensePlate ?? '[Chờ duyệt]';
+        idNumber = loadedIdNumber ?? '[Chờ duyệt]';
         notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       });
       

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../../core/theme/app_theme.dart';
@@ -48,6 +49,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
             final order = jsonDecode(orderJson) as Map<String, dynamic>;
             if (order['shipperId'] == shipperId && 
                 (order['status'] == 'waiting' || order['status'] == 'delivering' || order['status'] == 'completed')) {
+              
+              // 📍 Parse coordinates from order
+              LatLng? fromLatLng;
+              LatLng? toLatLng;
+              
+              if (order['fromLatLng'] != null && order['fromLatLng'] is Map) {
+                final fromMap = order['fromLatLng'] as Map<String, dynamic>;
+                fromLatLng = LatLng(fromMap['lat'] as double, fromMap['lng'] as double);
+              }
+              
+              if (order['toLatLng'] != null && order['toLatLng'] is Map) {
+                final toMap = order['toLatLng'] as Map<String, dynamic>;
+                toLatLng = LatLng(toMap['lat'] as double, toMap['lng'] as double);
+              }
+              
               return {
                 'id': order['id'],
                 'tripId': order['tripId'],
@@ -75,6 +91,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 'date': DateTime.parse(order['createdAt'] ?? DateTime.now().toIso8601String())
                     .toString()
                     .split(' ')[0],
+                // 📍 Include coordinates in the map
+                'fromLatLng': fromLatLng,
+                'toLatLng': toLatLng,
               };
             }
             return null;

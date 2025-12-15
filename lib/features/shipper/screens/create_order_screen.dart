@@ -2,8 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:green_route_app/core/services/order_pool_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/location_picker_widget.dart';
+import '../../../core/services/vietnam_locations_service.dart';
 
 class CreateOrderScreen extends StatefulWidget {
   const CreateOrderScreen({super.key});
@@ -22,7 +25,24 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final _pickupCtrl = TextEditingController();
   final _deliverCtrl = TextEditingController();
 
+  // Location selection
+  String? _selectedFromProvince;
+  String? _selectedFromDistrict;
+  String? _selectedToProvince;
+  String? _selectedToDistrict;
+  late LatLng _fromCoordinates;
+  late LatLng _toCoordinates;
+
   bool _loading = false;
+
+  final provinceOptions = VietnamLocationsService.getAllProvinces();
+
+  @override
+  void initState() {
+    super.initState();
+    _fromCoordinates = const LatLng(13.9833, 108.0000);
+    _toCoordinates = const LatLng(12.6667, 108.0500);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +58,20 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           key: _formKey,
           child: Column(
             children: [
-              _buildTextField(_fromCtrl, 'Điểm đi', Icons.location_on),
-              const SizedBox(height: 16),
-              _buildTextField(_toCtrl, 'Điểm đến', Icons.flag),
+              // LOCATION PICKER: FROM
+              LocationPickerWidget(
+                title: 'Điểm nhận hàng *',
+                selectedProvince: _selectedFromProvince ?? 'Gia Lai',
+                availableProvinces: provinceOptions,
+                onLocationSelected: (province, district, coordinates) {
+                  setState(() {
+                    _selectedFromProvince = province;
+                    _selectedFromDistrict = district;
+                    _fromCoordinates = coordinates;
+                    _fromCtrl.text = '$province${district != null ? ', $district' : ''}';
+                  });
+                },
+              ),
               const SizedBox(height: 16),
               _buildTextField(_goodsCtrl, 'Tên hàng hóa', Icons.inventory_2),
               const SizedBox(height: 16),
@@ -51,6 +82,22 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               _buildTextField(_pickupCtrl, 'Thời gian nhận hàng', Icons.access_time, readOnly: true, onTap: () => _selectDateTime(_pickupCtrl)),
               const SizedBox(height: 16),
               _buildTextField(_deliverCtrl, 'Thời gian giao hàng', Icons.access_time_filled, readOnly: true, onTap: () => _selectDateTime(_deliverCtrl)),
+              const SizedBox(height: 16),
+              
+              // LOCATION PICKER: TO
+              LocationPickerWidget(
+                title: 'Điểm giao hàng *',
+                selectedProvince: _selectedToProvince ?? 'Đắk Lắk',
+                availableProvinces: provinceOptions,
+                onLocationSelected: (province, district, coordinates) {
+                  setState(() {
+                    _selectedToProvince = province;
+                    _selectedToDistrict = district;
+                    _toCoordinates = coordinates;
+                    _toCtrl.text = '$province${district != null ? ', $district' : ''}';
+                  });
+                },
+              ),
               const SizedBox(height: 32),
 
               CustomButton(
@@ -95,7 +142,16 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   // POPUP XÁC NHẬN ĐẸP NHƯ ẢNH ANH GỬI – ĐÃ HOÀN HẢO 100%
   void _submitOrder() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedFromProvince == null || _selectedToProvince == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn điểm nhận và giao hàng'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
 
     final confirm = await showDialog<bool>(
@@ -120,8 +176,15 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                       const SizedBox(height: 8),
                       Text('Loại hàng hóa: ${_goodsCtrl.text}'),
                       Text('Khối lượng (Tấn): ${_weightCtrl.text}'),
-                      Text('Địa chỉ nhận hàng: ${_fromCtrl.text}'),
-                      Text('Địa chỉ giao hàng: ${_toCtrl.text}'),
+                      const SizedBox(height: 8),
+                      // Route (Province -> Province)
+                      Text('Tuyến đường: $_selectedFromProvince → $_selectedToProvince', 
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                      const SizedBox(height: 8),
+                      // Specific locations (Province, District)
+                      Text('Địa điểm nhận: ${_fromCtrl.text}'),
+                      Text('Địa điểm giao: ${_toCtrl.text}'),
+                      const SizedBox(height: 8),
                       Text('Ngày, giờ nhận hàng: ${_pickupCtrl.text}'),
                       Text('Ngày, giờ giao hàng: ${_deliverCtrl.text}'),
                       const SizedBox(height: 8),
@@ -171,10 +234,20 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     final shipperPhone = prefs.getString('user_phone') ?? '';
     final shipperName = prefs.getString('name') ?? 'Công ty ABC';
     
+    // 📍 Save coordinates for map display
+    await prefs.setDouble('order_from_lat_${shipperPhone}_temp', _fromCoordinates.latitude);
+    await prefs.setDouble('order_from_lng_${shipperPhone}_temp', _fromCoordinates.longitude);
+    await prefs.setDouble('order_to_lat_${shipperPhone}_temp', _toCoordinates.latitude);
+    await prefs.setDouble('order_to_lng_${shipperPhone}_temp', _toCoordinates.longitude);
+    await prefs.setString('order_from_district_${shipperPhone}_temp', _selectedFromDistrict ?? _selectedFromProvince ?? '');
+    await prefs.setString('order_to_district_${shipperPhone}_temp', _selectedToDistrict ?? _selectedToProvince ?? '');
+
+    debugPrint('📍 Saved order coordinates: FROM($_fromCoordinates) TO($_toCoordinates)');
+    
     OrderPoolService.instance.addOrder(
       type: OrderType.normal,
-      from: _fromCtrl.text,
-      to: _toCtrl.text,
+      from: _selectedFromProvince ?? 'Gia Lai',  // Province name only
+      to: _selectedToProvince ?? 'Đắk Lắk',      // Province name only
       goods: _goodsCtrl.text,
       weight: _weightCtrl.text,
       price: _priceCtrl.text,
@@ -182,6 +255,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       deliver: _deliverCtrl.text,
       shipperName: shipperName,
       shipperPhone: shipperPhone,
+      fromLatLng: _fromCoordinates,
+      toLatLng: _toCoordinates,
     );
 
     if (!mounted) return;

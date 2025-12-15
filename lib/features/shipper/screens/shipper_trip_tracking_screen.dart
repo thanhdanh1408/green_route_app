@@ -25,45 +25,214 @@ class _ShipperTripTrackingScreenState extends State<ShipperTripTrackingScreen> {
   }
 
   Future<void> _fetchRoute() async {
-    const start = LatLng(13.9833, 108.0000);
-    const end = LatLng(12.6667, 108.0500);
+    // Get coordinates from order data with fallback defaults
+    final start = widget.order['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.order['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
 
-    try {
-      final url = 'http://router.project-osrm.org/route/v1/driving/'
-          '${start.longitude},${start.latitude};'
-          '${end.longitude},${end.latitude}'
-          '?overview=full&geometries=geojson';
+    // Multiple OSRM servers for reliability
+    final osrmServers = [
+      'https://router.project-osrm.org',  // Primary (HTTPS)
+      'http://router.project-osrm.org',   // HTTP fallback
+      'https://routing.openstreetmap.de', // European backup
+    ];
 
-      final response = await http.get(Uri.parse(url));
+    debugPrint('🗺️ [OSRM-Shipper] Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final coords = data['routes'][0]['geometry']['coordinates'] as List;
+    for (var i = 0; i < osrmServers.length; i++) {
+      try {
+        final server = osrmServers[i];
+        final url = '$server/route/v1/driving/'
+            '${start.longitude},${start.latitude};'
+            '${end.longitude},${end.latitude}'
+            '?overview=full&geometries=geojson';
 
-        setState(() {
-          routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
-          isLoadingRoute = false;
-        });
-      } else {
-        _useFallbackRoute();
+        debugPrint('🔄 [OSRM-Shipper] Trying server ${i + 1}/${osrmServers.length}: $server');
+        
+        final response = await http.get(Uri.parse(url)).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⏱️ [OSRM-Shipper] Timeout on server ${i + 1}');
+            throw Exception('Timeout');
+          },
+        );
+
+        if (response.statusCode == 200) {
+          try {
+            final data = json.decode(response.body);
+            
+            if (data['routes'] == null || (data['routes'] as List).isEmpty) {
+              debugPrint('⚠️ [OSRM-Shipper] No routes found');
+              continue;
+            }
+            
+            final route = data['routes'][0];
+            final geometry = route['geometry'];
+            
+            if (geometry == null || geometry['coordinates'] == null) {
+              debugPrint('⚠️ [OSRM-Shipper] Invalid geometry');
+              continue;
+            }
+            
+            final coords = geometry['coordinates'] as List;
+            
+            if (coords.isEmpty) {
+              debugPrint('⚠️ [OSRM-Shipper] Empty coordinates');
+              continue;
+            }
+
+            // Convert GeoJSON [lng, lat] to LatLng [lat, lng]
+            List<LatLng> points = [];
+            for (var coord in coords) {
+              try {
+                final lat = (coord[1] as num).toDouble();
+                final lng = (coord[0] as num).toDouble();
+                points.add(LatLng(lat, lng));
+              } catch (e) {
+                continue;
+              }
+            }
+
+            if (points.isEmpty) {
+              debugPrint('⚠️ [OSRM-Shipper] No valid coordinates parsed');
+              continue;
+            }
+
+            if (!mounted) return;
+            setState(() {
+              routePoints = points;
+              isLoadingRoute = false;
+            });
+
+            debugPrint('✅ [OSRM-Shipper] Loaded route with ${routePoints.length} points');
+            return;
+          } catch (parseError) {
+            debugPrint('❌ [OSRM-Shipper] Parse error: $parseError');
+            continue;
+          }
+        } else {
+          debugPrint('⚠️ [OSRM-Shipper] Server returned ${response.statusCode}');
+          continue;
+        }
+      } catch (e) {
+        debugPrint('❌ [OSRM-Shipper] Error: $e');
+        continue;
       }
-    } catch (e) {
-      _useFallbackRoute();
     }
+
+    // All servers failed
+    debugPrint('❌ [OSRM-Shipper] All servers failed, using fallback');
+    _useFallbackRoute(start, end);
   }
 
-  void _useFallbackRoute() {
+  void _useFallbackRoute(LatLng start, LatLng end) {
+    if (!mounted) return;
+    
     setState(() {
       routePoints = [
-        const LatLng(13.9833, 108.0000),
-        const LatLng(13.7, 108.02),
-        const LatLng(13.4, 108.05),
-        const LatLng(13.1, 108.06),
-        const LatLng(12.9, 108.055),
-        const LatLng(12.6667, 108.0500),
+        start,
+        LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2),
+        end,
       ];
       isLoadingRoute = false;
     });
+    debugPrint('⚠️ [Shipper] Using fallback route');
+  }
+
+  // BUILD MAP WITH DYNAMIC MARKERS AND ROUTE
+  Widget _buildMapWidget() {
+    final start = widget.order['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.order['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+    
+    // Calculate center and zoom level based on route
+    final centerLat = (start.latitude + end.latitude) / 2;
+    final centerLng = (start.longitude + end.longitude) / 2;
+    
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: LatLng(centerLat, centerLng),
+        initialZoom: 9.0,
+      ),
+      children: [
+        // OpenStreetMap tiles
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.green_route_app',
+          maxNativeZoom: 19,
+          tileSize: 256,
+        ),
+        
+        // Route polyline
+        if (routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: AppColors.primary,
+                strokeWidth: 4,
+                borderColor: AppColors.primary.withOpacity(0.5),
+                borderStrokeWidth: 1,
+              ),
+            ],
+          ),
+        
+        // Start and End markers
+        MarkerLayer(
+          markers: [
+            // START MARKER
+            Marker(
+              point: start,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.green,
+                      boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.location_on, color: Colors.white, size: 24),
+                  ),
+                  const Text('Xuất phát', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            
+            // END MARKER
+            Marker(
+              point: end,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red,
+                      boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.flag, color: Colors.white, size: 24),
+                  ),
+                  const Text('Đích đến', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        // Loading indicator
+        if (isLoadingRoute)
+          const Positioned(
+            top: 12,
+            right: 12,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -84,55 +253,17 @@ class _ShipperTripTrackingScreenState extends State<ShipperTripTrackingScreen> {
           children: [
             // BẢN ĐỒ
             Container(
-              height: 300,
+              height: 350,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey[300]!),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, spreadRadius: 2),
+                ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: const LatLng(13.9833, 108.0000),
-                    initialZoom: 8.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.green_route_app',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: const LatLng(13.9833, 108.0000),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.location_on, color: Colors.green, size: 40),
-                        ),
-                        Marker(
-                          point: const LatLng(12.6667, 108.0500),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.flag, color: Colors.red, size: 40),
-                        ),
-                      ],
-                    ),
-                    if (routePoints.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: routePoints,
-                            color: AppColors.primary,
-                            strokeWidth: 4,
-                          ),
-                        ],
-                      ),
-                    if (isLoadingRoute)
-                      const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                  ],
-                ),
+                child: _buildMapWidget(),
               ),
             ),
             const SizedBox(height: 24),

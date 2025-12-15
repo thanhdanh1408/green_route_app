@@ -1,7 +1,10 @@
 // lib/features/shipper/screens/confirm_booking_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/location_picker_widget.dart';
+import '../../../core/services/vietnam_locations_service.dart';
 import '../services/booking_service.dart';
 
 class ConfirmBookingScreen extends StatefulWidget {
@@ -22,6 +25,14 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
   final _deliverCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
 
+  // Location Picker State
+  String? _selectedFromProvince;
+  String? _selectedFromDistrict;
+  String? _selectedToProvince;
+  String? _selectedToDistrict;
+  late LatLng _fromCoordinates;
+  late LatLng _toCoordinates;
+
   bool _insurance = true;
   bool _agreeTerms = true;
 
@@ -31,6 +42,10 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
     final priceStr = (widget.driver['price'] as String?) ?? '0';
     final cleanPrice = priceStr.replaceAll(RegExp(r'[^\d]'), '');
     _priceCtrl.text = cleanPrice.isEmpty ? '0' : cleanPrice;
+    
+    // Initialize default coordinates
+    _fromCoordinates = const LatLng(13.9833, 108.0000); // Pleiku, Gia Lai
+    _toCoordinates = const LatLng(12.6667, 108.0500);   // Buôn Ma Thuột, Đắk Lắk
   }
 
   @override
@@ -69,8 +84,42 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
 
               _buildField(_goodsCtrl, 'Loại hàng hóa *', 'VD: Cà phê'),
               _buildField(_weightCtrl, 'Khối lượng (Tấn) *', 'VD: 5', TextInputType.number),
-              _buildField(_fromCtrl, 'Địa chỉ nhận hàng *'),
-              _buildField(_toCtrl, 'Địa chỉ giao hàng *'),
+              
+              // Location Picker - From
+              const SizedBox(height: 4),
+              const Text('Địa chỉ nhận hàng *', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+              const SizedBox(height: 8),
+              LocationPickerWidget(
+                title: 'Chọn nơi nhận hàng',
+                selectedProvince: _selectedFromProvince ?? 'Gia Lai',
+                availableProvinces: VietnamLocationsService.getAllProvinces(),
+                onLocationSelected: (province, district, coordinates) {
+                  setState(() {
+                    _selectedFromProvince = province;
+                    _selectedFromDistrict = district;
+                    _fromCoordinates = coordinates;
+                    _fromCtrl.text = '$province${district != null ? ', $district' : ''}';
+                  });
+                },
+              ),
+              
+              // Location Picker - To
+              const SizedBox(height: 16),
+              const Text('Địa chỉ giao hàng *', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+              const SizedBox(height: 8),
+              LocationPickerWidget(
+                title: 'Chọn nơi giao hàng',
+                selectedProvince: _selectedToProvince ?? 'Đắk Lắk',
+                availableProvinces: VietnamLocationsService.getAllProvinces(),
+                onLocationSelected: (province, district, coordinates) {
+                  setState(() {
+                    _selectedToProvince = province;
+                    _selectedToDistrict = district;
+                    _toCoordinates = coordinates;
+                    _toCtrl.text = '$province${district != null ? ', $district' : ''}';
+                  });
+                },
+              ),
               _buildDateField(_pickupCtrl, 'Ngày nhận hàng *'),
               _buildDateField(_deliverCtrl, 'Ngày giao hàng *'),
               _buildField(_priceCtrl, 'Giá cước thương lượng (đ) *', '3.200.000', TextInputType.number),
@@ -106,8 +155,12 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16)),
                       onPressed: () {
-                        if (_agreeTerms && (_formKey.currentState?.validate() ?? false)) {
+                        if (_agreeTerms && (_formKey.currentState?.validate() ?? false) && _selectedFromProvince != null && _selectedToProvince != null) {
                           _confirmBooking();
+                        } else if (_selectedFromProvince == null || _selectedToProvince == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng chọn nơi nhận và giao hàng'), backgroundColor: Colors.red),
+                          );
                         }
                       },
                       child: const Text('XÁC NHẬN ĐẶT XE', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -126,6 +179,16 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
     final prefs = await SharedPreferences.getInstance();
     final shipperId = prefs.getString('user_phone') ?? '';
     final shipperName = prefs.getString('name') ?? 'Chủ hàng';
+    
+    // Save location coordinates for map display
+    await prefs.setDouble('order_from_lat_${shipperId}_confirm', _fromCoordinates.latitude);
+    await prefs.setDouble('order_from_lng_${shipperId}_confirm', _fromCoordinates.longitude);
+    await prefs.setString('order_from_district_${shipperId}_confirm', _selectedFromDistrict ?? _selectedFromProvince ?? '');
+    await prefs.setDouble('order_to_lat_${shipperId}_confirm', _toCoordinates.latitude);
+    await prefs.setDouble('order_to_lng_${shipperId}_confirm', _toCoordinates.longitude);
+    await prefs.setString('order_to_district_${shipperId}_confirm', _selectedToDistrict ?? _selectedToProvince ?? '');
+    
+    debugPrint('📍 Saved booking confirmation coordinates: FROM($_fromCoordinates) TO($_toCoordinates)');
     
     final price = int.tryParse(_priceCtrl.text.replaceAll('.', '')) ?? 0;
     final insuranceFee = _insurance ? 160000 : 0;

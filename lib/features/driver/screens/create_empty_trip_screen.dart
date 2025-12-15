@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../../core/widgets/location_picker_widget.dart';
+import '../../../core/services/vietnam_locations_service.dart';
 import '../services/empty_trip_service.dart';
 
 class CreateEmptyTripScreen extends StatefulWidget {
@@ -23,8 +26,14 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
 
   // Dropdown values
   String? _selectedFrom;
+  String? _selectedFromDistrict;
   String? _selectedTo;
+  String? _selectedToDistrict;
   String? _maxShippers;
+
+  // Coordinates for map display
+  late LatLng _fromCoordinates;
+  late LatLng _toCoordinates;
 
   // DateTime values
   DateTime? _pickupTime;
@@ -38,19 +47,16 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
   // Options for dropdowns
   final shipperOptions = ['1', '2', '3', '4', '5'];
   // 11 tỉnh Khu vực Miền Trung Tây Nguyên sau sáp nhập
-  final provinceOptions = [
-    'Thành phố Huế',
-    'Thành phố Đà Nẵng',
-    'Tỉnh Thanh Hóa',
-    'Tỉnh Nghệ An',
-    'Tỉnh Hà Tĩnh',
-    'Tỉnh Quảng Trị',
-    'Tỉnh Quảng Ngãi',
-    'Tỉnh Khánh Hòa',
-    'Tỉnh Gia Lai',
-    'Tỉnh Đắk Lắk',
-    'Tỉnh Lâm Đồng',
-  ];
+  final provinceOptions = VietnamLocationsService.getAllProvinces();
+
+  @override
+  void initState() {
+    super.initState();
+    _fromCoordinates = const LatLng(13.9833, 108.0000);
+    _toCoordinates = const LatLng(12.6667, 108.0500);
+    debugPrint('🚀 INIT: _fromCoordinates = $_fromCoordinates (Gia Lai default)');
+    debugPrint('🚀 INIT: _toCoordinates = $_toCoordinates (Dak Lak default)');
+  }
 
   @override
   void dispose() {
@@ -159,25 +165,20 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Dropdown tuyến đường
-              const Text('Điểm xuất phát *',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedFrom,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                hint: const Text('Chọn tỉnh/thành phố'),
-                items: provinceOptions
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                    .toList(),
-                onChanged: (value) => setState(() => _selectedFrom = value),
-                validator: (value) =>
-                    value == null ? 'Chọn điểm xuất phát' : null,
+              // LOCATION PICKER 1: FROM (Điểm xuất phát)
+              LocationPickerWidget(
+                title: 'Điểm xuất phát *',
+                selectedProvince: _selectedFrom ?? 'Gia Lai',
+                availableProvinces: provinceOptions,
+                onLocationSelected: (province, district, coordinates) {
+                  debugPrint('🎯 FROM selected: $province, $district → ${coordinates.latitude}, ${coordinates.longitude}');
+                  setState(() {
+                    _selectedFrom = province;
+                    _selectedFromDistrict = district;
+                    _fromCoordinates = coordinates;
+                  });
+                  debugPrint('📍 _fromCoordinates updated to: $_fromCoordinates');
+                },
               ),
               const SizedBox(height: 16),
 
@@ -199,23 +200,20 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
               ),
               const SizedBox(height: 16),
 
-              const Text('Điểm đến *',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedTo,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                hint: const Text('Chọn tỉnh/thành phố'),
-                items: provinceOptions
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                    .toList(),
-                onChanged: (value) => setState(() => _selectedTo = value),
-                validator: (value) => value == null ? 'Chọn điểm đến' : null,
+              // LOCATION PICKER 2: TO (Điểm đến)
+              LocationPickerWidget(
+                title: 'Điểm đến *',
+                selectedProvince: _selectedTo ?? 'Đắk Lắk',
+                availableProvinces: provinceOptions,
+                onLocationSelected: (province, district, coordinates) {
+                  debugPrint('🎯 TO selected: $province, $district → ${coordinates.latitude}, ${coordinates.longitude}');
+                  setState(() {
+                    _selectedTo = province;
+                    _selectedToDistrict = district;
+                    _toCoordinates = coordinates;
+                  });
+                  debugPrint('📍 _toCoordinates updated to: $_toCoordinates');
+                },
               ),
               const SizedBox(height: 16),
 
@@ -353,7 +351,9 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                   onPressed: () async {
                     if (_formKey.currentState!.validate() &&
                         _pickupTime != null &&
-                        _deliveryTime != null) {
+                        _deliveryTime != null &&
+                        _selectedFrom != null &&
+                        _selectedTo != null) {
                       final prefs = await SharedPreferences.getInstance();
                       final driverId = prefs.getString('user_phone') ?? '';
                       final driverName = prefs.getString('name') ?? '';
@@ -386,6 +386,19 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                             '✅ Auto-saved route to user-specific keys when creating trip');
                       }
 
+                      // 📍 Save coordinates for map display
+                      debugPrint('💾 BEFORE SAVE: _fromCoordinates = $_fromCoordinates, _toCoordinates = $_toCoordinates');
+                      await prefs.setDouble('trip_from_lat_${driverId}_temp', _fromCoordinates.latitude);
+                      await prefs.setDouble('trip_from_lng_${driverId}_temp', _fromCoordinates.longitude);
+                      await prefs.setDouble('trip_to_lat_${driverId}_temp', _toCoordinates.latitude);
+                      await prefs.setDouble('trip_to_lng_${driverId}_temp', _toCoordinates.longitude);
+                      await prefs.setString('trip_from_district_${driverId}_temp', _selectedFromDistrict ?? _selectedFrom ?? '');
+                      await prefs.setString('trip_to_district_${driverId}_temp', _selectedToDistrict ?? _selectedTo ?? '');
+
+                      debugPrint('📍 Saved trip coordinates: FROM($_fromCoordinates) TO($_toCoordinates)');
+                      debugPrint('✅ trip_from_lat_${driverId}_temp = ${_fromCoordinates.latitude}');
+                      debugPrint('✅ trip_to_lat_${driverId}_temp = ${_toCoordinates.latitude}');
+
                       final trip = await EmptyTripService.createEmptyTrip(
                         driverId: driverId,
                         driverName: driverName,
@@ -400,6 +413,8 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                         pickupTime: _pickupTime!,
                         deliveryTime: _deliveryTime!,
                         maxShippers: int.parse(_maxShippers!),
+                        fromLatLng: _fromCoordinates,
+                        toLatLng: _toCoordinates,
                       );
 
                       if (!mounted) return;
@@ -411,6 +426,13 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                         ),
                       );
                       Navigator.pop(context, trip);
+                    } else if (_selectedFrom == null || _selectedTo == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng chọn điểm xuất phát và điểm đến'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
                     } else if (_pickupTime == null || _deliveryTime == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

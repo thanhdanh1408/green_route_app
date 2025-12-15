@@ -1,6 +1,6 @@
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
 
 class EmptyTrip {
   final String id;
@@ -20,6 +20,8 @@ class EmptyTrip {
   final int maxShippers; // Số lượng shipper tối đa có thể join
   final List<ShipperInTrip> joinedShippers; // Danh sách shipper đã join
   final String status; // 'open' | 'full' | 'departed' | 'completed'
+  final LatLng? fromLatLng; // GPS coordinates for FROM location
+  final LatLng? toLatLng; // GPS coordinates for TO location
 
   EmptyTrip({
     required this.id,
@@ -38,6 +40,8 @@ class EmptyTrip {
     required this.maxShippers,
     this.joinedShippers = const [],
     this.status = 'open',
+    this.fromLatLng,
+    this.toLatLng,
   }) : createdAt = DateTime.now();
 
   bool get hasAvailableSlots => joinedShippers.length < maxShippers;
@@ -83,10 +87,24 @@ class EmptyTrip {
       'maxShippers': maxShippers,
       'joinedShippers': joinedShippers.map((s) => s.toMap()).toList(),
       'status': status,
+      'fromLatLng': fromLatLng != null ? {'lat': fromLatLng!.latitude, 'lng': fromLatLng!.longitude} : null,
+      'toLatLng': toLatLng != null ? {'lat': toLatLng!.latitude, 'lng': toLatLng!.longitude} : null,
     };
   }
 
   factory EmptyTrip.fromMap(Map<String, dynamic> map) {
+    LatLng? parseLatLng(dynamic data) {
+      if (data == null) return null;
+      try {
+        if (data is Map) {
+          return LatLng(data['lat'] as double, data['lng'] as double);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error parsing LatLng: $e');
+      }
+      return null;
+    }
+
     return EmptyTrip(
       id: map['id'] ?? '',
       driverId: map['driverId'] ?? '',
@@ -107,6 +125,8 @@ class EmptyTrip {
               .toList() ??
           [],
       status: map['status'] as String? ?? 'open',
+      fromLatLng: parseLatLng(map['fromLatLng']),
+      toLatLng: parseLatLng(map['toLatLng']),
     );
   }
 
@@ -135,6 +155,8 @@ class EmptyTrip {
       maxShippers: maxShippers,
       joinedShippers: joinedShippers ?? this.joinedShippers,
       status: status ?? this.status,
+      fromLatLng: fromLatLng,
+      toLatLng: toLatLng,
     );
   }
 }

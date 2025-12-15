@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
+import '../../../core/services/vietnam_locations_service.dart';
 
 class DriverRouteSelectionScreen extends StatefulWidget {
   final VoidCallback? onRouteSelected;
@@ -20,8 +21,15 @@ class _DriverRouteSelectionScreenState extends State<DriverRouteSelectionScreen>
   String? weight = '5';
   String? timeRange;
 
-  final provinces = ['Gia Lai', 'Đắk Lắk', 'Kon Tum', 'Bình Định', 'Quảng Ngãi', 'Đà Nẵng'];
+  late List<String> provinces;
   final weights = ['5', '8', '10', '15', '20', '30'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load 11 merged provinces from VietnamLocationsService
+    provinces = VietnamLocationsService.getMajorCities();
+  }
 
   Future<void> _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(

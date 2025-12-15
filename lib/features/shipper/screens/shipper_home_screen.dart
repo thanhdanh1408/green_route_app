@@ -1,6 +1,7 @@
 // lib/features/shipper/screens/shipper_home_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../common/widgets/chatbot_fab.dart';
 import 'find_driver_screen.dart';
 import 'match_cargo_screen.dart';
 import 'my_orders_screen.dart';
@@ -62,17 +63,34 @@ class _ShipperHomeScreenState extends State<ShipperHomeScreen> {
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: _pages),
 
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton.extended(
-              onPressed: _showRegisterOrderConfirm, // ← Đăng tìm tài xế (chờ nhận)
-              backgroundColor: AppColors.primary,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Đăng tìm tài xế',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+      floatingActionButton: Stack(
+        children: [
+          // Đăng tìm tài xế button (ở giữa, chỉ hiển thị ở tab 0)
+          if (_selectedIndex == 0)
+            Positioned(
+              bottom: 0,
+              left: MediaQuery.of(context).size.width / 2 - 100,
+              child: SizedBox(
+                width: 200,
+                child: FloatingActionButton.extended(
+                  onPressed: _showRegisterOrderConfirm,
+                  backgroundColor: AppColors.primary,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text(
+                    'Đăng tìm tài xế',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
               ),
-            )
-          : null,
+            ),
+          // Chatbot button (luôn ở góc phải dưới)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: ChatbotFAB(),
+          ),
+        ],
+      ),
 
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
 

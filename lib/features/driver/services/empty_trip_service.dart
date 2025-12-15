@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:uuid/uuid.dart';
 import '../models/empty_trip_model.dart';
 
@@ -27,6 +28,8 @@ class EmptyTripService {
     required DateTime pickupTime,
     required DateTime deliveryTime,
     required int maxShippers,
+    LatLng? fromLatLng, // GPS coordinates
+    LatLng? toLatLng, // GPS coordinates
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -46,6 +49,8 @@ class EmptyTripService {
       deliveryTime: deliveryTime,
       maxShippers: maxShippers,
       status: 'open',
+      fromLatLng: fromLatLng,
+      toLatLng: toLatLng,
     );
 
     final allTripsJson = prefs.getStringList(_emptyTripsKey) ?? [];
@@ -53,6 +58,7 @@ class EmptyTripService {
     await prefs.setStringList(_emptyTripsKey, allTripsJson);
 
     debugPrint('✅ Created trip: ${trip.from} → ${trip.to} | maxShippers: ${trip.maxShippers} | status: ${trip.status} | hasAvailableSlots: ${trip.hasAvailableSlots}');
+    debugPrint('📍 Coordinates: FROM($fromLatLng) TO($toLatLng)');
     debugPrint('📦 Total trips now in storage: ${allTripsJson.length}');
     
     _tripStreamController.add(null); // Thông báo có thay đổi
@@ -211,6 +217,9 @@ class EmptyTripService {
       'deliverDate': trip.deliveryTime.toIso8601String(),
       'status': 'waiting', // Đang chờ chuyến đầy
       'createdAt': DateTime.now().toIso8601String(),
+      // 📍 IMPORTANT: Include coordinates from trip
+      'fromLatLng': trip.fromLatLng != null ? {'lat': trip.fromLatLng!.latitude, 'lng': trip.fromLatLng!.longitude} : null,
+      'toLatLng': trip.toLatLng != null ? {'lat': trip.toLatLng!.latitude, 'lng': trip.toLatLng!.longitude} : null,
     };
     shipperOrders.add(jsonEncode(order));
     await prefs.setStringList('shipper_waiting_orders', shipperOrders);
@@ -289,6 +298,17 @@ class EmptyTripService {
     
     // Tạo order waiting cho shipper
     final shipperOrders = prefs.getStringList('shipper_waiting_orders') ?? [];
+    
+    // 📍 Extract provinces from shipper's fromDetail and toDetail
+    // E.g., "Pleiku, Gia Lai" → "Gia Lai", "Nha Trang, Khánh Hòa" → "Khánh Hòa"
+    String extractProvince(String detail) {
+      final parts = detail.split(',');
+      return parts.isNotEmpty ? parts.last.trim() : '';
+    }
+    
+    final shipperFromProvince = request.fromDetail.isNotEmpty ? extractProvince(request.fromDetail) : trip.from;
+    final shipperToProvince = request.toDetail.isNotEmpty ? extractProvince(request.toDetail) : trip.to;
+    
     final order = {
       'id': '${tripId}_$shipperId',
       'tripId': tripId,
@@ -297,8 +317,8 @@ class EmptyTripService {
       'shipperPhone': request.shipperPhone,
       'driverName': trip.driverName,
       'driverPhone': trip.driverPhone,
-      'from': trip.from,
-      'to': trip.to,
+      'from': shipperFromProvince,  // From shipper's fromDetail
+      'to': shipperToProvince,      // From shipper's toDetail
       'fromDetail': request.fromDetail,
       'toDetail': request.toDetail,
       'goods': request.cargoType,
@@ -308,6 +328,9 @@ class EmptyTripService {
       'deliverDate': trip.deliveryTime.toIso8601String(),
       'status': 'waiting',
       'createdAt': DateTime.now().toIso8601String(),
+      // 📍 Include coordinates from trip (will show trip route until we enhance with shipper input)
+      'fromLatLng': trip.fromLatLng != null ? {'lat': trip.fromLatLng!.latitude, 'lng': trip.fromLatLng!.longitude} : null,
+      'toLatLng': trip.toLatLng != null ? {'lat': trip.toLatLng!.latitude, 'lng': trip.toLatLng!.longitude} : null,
     };
     shipperOrders.add(jsonEncode(order));
     await prefs.setStringList('shipper_waiting_orders', shipperOrders);
