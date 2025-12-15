@@ -74,25 +74,31 @@ class _DriverCardState extends State<DriverCard> {
                     children: [
                       const Icon(Icons.star, color: Colors.amber, size: 20),
                       const SizedBox(width: 4),
-                      if (_isLoading)
-                        const SizedBox(
-                          height: 12,
-                          width: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      else if (_ratingCount > 0)
-                        Text(
-                          '${_rating.toStringAsFixed(1)} ($_ratingCount)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        )
-                      else
-                        Text(
-                          'Chưa có đánh giá',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      const SizedBox(width: 8),
-                      Text('• ${widget.data['vehicle'] ?? 'Xe tải'}', style: TextStyle(color: Colors.grey[600])),
+                      Expanded(
+                        child: _isLoading
+                          ? const SizedBox(
+                              height: 12,
+                              width: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _ratingCount > 0
+                            ? Text(
+                                '${_rating.toStringAsFixed(1)} ($_ratingCount)',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              )
+                            : Text(
+                                'Chưa có đánh giá',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.data['vehicle'] ?? 'Xe tải',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   _buildAddressRow(Icons.arrow_upward, widget.data['fromAddress'] ?? 'N/A'),

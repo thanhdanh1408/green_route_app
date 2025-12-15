@@ -58,6 +58,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         // Province Dropdown
         DropdownButtonFormField<String>(
           value: selectedProvince,
+          isExpanded: true,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -84,6 +85,7 @@ class _LocationPickerWidgetState extends State<LocationPickerWidget> {
         if (districts.isNotEmpty) ...[
           DropdownButtonFormField<String>(
             value: selectedDistrict,
+            isExpanded: true,
             decoration: InputDecoration(
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

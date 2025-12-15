@@ -34,6 +34,19 @@ class OrderStatusService {
       'shipperPhone': order.shipperPhone ?? '',
       'fromDetail': order.fromDetail ?? '',
       'toDetail': order.toDetail ?? '',
+      // 📍 Add coordinates from order
+      'fromLatLng': order.fromLatLng != null
+          ? {
+              'lat': order.fromLatLng!.latitude,
+              'lng': order.fromLatLng!.longitude
+            }
+          : null,
+      'toLatLng': order.toLatLng != null
+          ? {
+              'lat': order.toLatLng!.latitude,
+              'lng': order.toLatLng!.longitude
+            }
+          : null,
     };
 
     final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
@@ -49,25 +62,28 @@ class OrderStatusService {
 
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     if (!driverBids.any((s) => jsonDecode(s)['orderId'] == order.id)) {
-       driverBids.add(jsonEncode(bid));
-       await prefs.setStringList(_driverBidsKey, driverBids);
+      driverBids.add(jsonEncode(bid));
+      await prefs.setStringList(_driverBidsKey, driverBids);
     }
 
     _orderStreamController.add(null);
   }
 
   static Future<void> shipperAcceptBid(String orderId, String driverId) async {
-    debugPrint('👍 Shipper accepting bid: orderId=$orderId, driverId=$driverId');
+    debugPrint(
+        '👍 Shipper accepting bid: orderId=$orderId, driverId=$driverId');
     final prefs = await SharedPreferences.getInstance();
 
     final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
     debugPrint('  - Total shipper bids before: ${shipperBids.length}');
-    
+
     final updatedShipperBids = shipperBids.map((s) {
       final bid = jsonDecode(s);
       if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
-        debugPrint('  ✅ Found matching bid in shipper_received_bids, updating to accepted');
-        debugPrint('     shipperId: ${bid['shipperId']}, shipperPhone: ${bid['shipperPhone']}');
+        debugPrint(
+            '  ✅ Found matching bid in shipper_received_bids, updating to accepted');
+        debugPrint(
+            '     shipperId: ${bid['shipperId']}, shipperPhone: ${bid['shipperPhone']}');
         bid['status'] = 'accepted';
       }
       return jsonEncode(bid);
@@ -76,11 +92,12 @@ class OrderStatusService {
 
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     debugPrint('  - Total driver bids before: ${driverBids.length}');
-    
-     final updatedDriverBids = driverBids.map((s) {
+
+    final updatedDriverBids = driverBids.map((s) {
       final bid = jsonDecode(s);
       if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
-        debugPrint('  ✅ Found matching bid in driver_bids, updating to accepted');
+        debugPrint(
+            '  ✅ Found matching bid in driver_bids, updating to accepted');
         bid['status'] = 'accepted';
       }
       return jsonEncode(bid);
@@ -104,7 +121,7 @@ class OrderStatusService {
   }
 
   static Future<List<OrderModel>> getDeliveringOrders() async {
-     final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     final orders = <OrderModel>[];
     for (final s in driverBids) {
@@ -196,22 +213,23 @@ class OrderStatusService {
 
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     if (!driverBids.any((s) => jsonDecode(s)['orderId'] == order.id)) {
-       driverBids.add(jsonEncode(bid));
-       await prefs.setStringList(_driverBidsKey, driverBids);
+      driverBids.add(jsonEncode(bid));
+      await prefs.setStringList(_driverBidsKey, driverBids);
     }
 
     _orderStreamController.add(null);
   }
 
   // Lấy các đơn đã accepted HOẶC completed của shipper
-  static Future<List<Map<String, dynamic>>> getShipperAcceptedOrders(String shipperId) async {
+  static Future<List<Map<String, dynamic>>> getShipperAcceptedOrders(
+      String shipperId) async {
     debugPrint('🔍 getShipperAcceptedOrders for shipperId: $shipperId');
     final prefs = await SharedPreferences.getInstance();
     final bidsJson = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
     debugPrint('  - Total bids in storage: ${bidsJson.length}');
-    
+
     final acceptedOrders = <Map<String, dynamic>>[];
-    
+
     for (final jsonStr in bidsJson) {
       try {
         final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -219,20 +237,24 @@ class OrderStatusService {
         final bidShipperId = decoded['shipperId'] ?? '';
         final bidShipperPhone = decoded['shipperPhone'] ?? '';
         final bidStatus = decoded['status'] ?? '';
-        
-        debugPrint('  - Bid: orderId=${decoded['orderId']}, status=$bidStatus, shipperId=$bidShipperId, shipperPhone=$bidShipperPhone');
-        
-        // BỔ SUNG: Lấy cả 'accepted' VÀ 'completed' để shipper thấy được trạng thái hoàn thành
-        if ((decoded['status'] == 'accepted' || decoded['status'] == 'completed') && 
+
+        debugPrint(
+            '  - Bid: orderId=${decoded['orderId']}, status=$bidStatus, shipperId=$bidShipperId, shipperPhone=$bidShipperPhone');
+
+        // Include 'pending' (waiting for driver to accept), 'accepted' (driver accepted), and 'completed'
+        if ((decoded['status'] == 'pending' ||
+                decoded['status'] == 'accepted' ||
+                decoded['status'] == 'completed') &&
             (bidShipperId == shipperId || bidShipperPhone == shipperId)) {
-          debugPrint('    ✅ MATCHED! Adding to orders (status: ${decoded['status']})');
+          debugPrint(
+              '    ✅ MATCHED! Adding to orders (status: ${decoded['status']})');
           acceptedOrders.add(decoded);
         }
       } catch (e) {
         debugPrint('Error decoding bid: $e');
       }
     }
-    
+
     debugPrint('  - Total orders found: ${acceptedOrders.length}');
     return acceptedOrders;
   }
@@ -242,17 +264,17 @@ class OrderStatusService {
     debugPrint('✅ Completing regular order: $orderId');
     final prefs = await SharedPreferences.getInstance();
     final completedAt = DateTime.now().toIso8601String();
-    
+
     // Update driver_bids
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     debugPrint('  📋 Checking ${driverBids.length} orders in driver_bids');
-    
+
     bool foundInDriverBids = false;
     final updatedDriverBids = driverBids.map((s) {
       final bid = jsonDecode(s);
       final bidOrderId = bid['orderId'];
       debugPrint('    - Checking orderId: $bidOrderId (looking for: $orderId)');
-      
+
       if (bidOrderId == orderId) {
         debugPrint('    ✓ MATCH FOUND in driver_bids! Marking as completed');
         bid['status'] = 'completed';
@@ -261,44 +283,47 @@ class OrderStatusService {
       }
       return jsonEncode(bid);
     }).toList();
-    
+
     if (!foundInDriverBids) {
       debugPrint('    ⚠️ Order $orderId NOT FOUND in driver_bids!');
     }
-    
+
     await prefs.setStringList(_driverBidsKey, updatedDriverBids);
 
     // Update shipper_received_bids
     final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
-    debugPrint('  📋 Checking ${shipperBids.length} orders in shipper_received_bids');
-    
+    debugPrint(
+        '  📋 Checking ${shipperBids.length} orders in shipper_received_bids');
+
     bool foundInShipperBids = false;
     final updatedShipperBids = shipperBids.map((s) {
       final bid = jsonDecode(s);
       final bidOrderId = bid['orderId'];
       debugPrint('    - Checking orderId: $bidOrderId (looking for: $orderId)');
-      
+
       if (bidOrderId == orderId) {
-        debugPrint('    ✓ MATCH FOUND in shipper_received_bids! Marking as completed');
+        debugPrint(
+            '    ✓ MATCH FOUND in shipper_received_bids! Marking as completed');
         bid['status'] = 'completed';
         bid['completedAt'] = completedAt; // Thêm timestamp
         foundInShipperBids = true;
       }
       return jsonEncode(bid);
     }).toList();
-    
+
     if (!foundInShipperBids) {
       debugPrint('    ⚠️ Order $orderId NOT FOUND in shipper_received_bids!');
     }
-    
+
     await prefs.setStringList(_shipperReceivedBidsKey, updatedShipperBids);
 
     if (foundInDriverBids || foundInShipperBids) {
-      debugPrint('  ✅ Order $orderId marked as completed (driver: $foundInDriverBids, shipper: $foundInShipperBids)');
+      debugPrint(
+          '  ✅ Order $orderId marked as completed (driver: $foundInDriverBids, shipper: $foundInShipperBids)');
     } else {
       debugPrint('  ❌ Order $orderId was NOT FOUND in any storage!');
     }
-    
+
     _orderStreamController.add(null);
   }
 
@@ -324,7 +349,8 @@ class OrderStatusService {
   }
 
   // Get all completed orders for a specific driver
-  static Future<List<OrderModel>> getCompletedOrdersForDriver(String driverId) async {
+  static Future<List<OrderModel>> getCompletedOrdersForDriver(
+      String driverId) async {
     final prefs = await SharedPreferences.getInstance();
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
     final orders = <OrderModel>[];
@@ -335,5 +361,95 @@ class OrderStatusService {
       }
     }
     return orders;
+  }
+
+  // Request to cancel order (driver side)
+  static Future<void> requestCancelOrder({
+    required String orderId,
+    required String reason,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final driverId = prefs.getString('user_phone') ?? '';
+
+    // Update order status in driver_bids
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final updatedDriverBids = driverBids.map((bidJson) {
+      final bid = jsonDecode(bidJson) as Map<String, dynamic>;
+      if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
+        bid['status'] = 'pending_cancellation';
+        bid['cancelReason'] = reason;
+        bid['cancelRequestedAt'] = DateTime.now().toIso8601String();
+        bid['cancelRequestedBy'] = 'driver';
+        debugPrint(
+            '📝 Updated order $orderId to pending_cancellation in driver_bids');
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_driverBidsKey, updatedDriverBids);
+
+    // Also update in shipper_received_bids if exists
+    final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    final updatedShipperBids = shipperBids.map((bidJson) {
+      final bid = jsonDecode(bidJson) as Map<String, dynamic>;
+      if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
+        bid['status'] = 'pending_cancellation';
+        bid['cancelReason'] = reason;
+        bid['cancelRequestedAt'] = DateTime.now().toIso8601String();
+        bid['cancelRequestedBy'] = 'driver';
+        debugPrint(
+            '📝 Updated order $orderId to pending_cancellation in shipper_received_bids');
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_shipperReceivedBidsKey, updatedShipperBids);
+
+    // Create cancellation request for admin
+    final cancelRequests = prefs.getStringList('cancel_requests') ?? [];
+    final cancelRequest = {
+      'id': '${orderId}_cancel_${DateTime.now().millisecondsSinceEpoch}',
+      'orderId': orderId,
+      'orderType': 'regular',
+      'requestedBy': 'driver',
+      'driverId': driverId,
+      'reason': reason,
+      'status': 'pending',
+      'requestedAt': DateTime.now().toIso8601String(),
+    };
+    cancelRequests.add(jsonEncode(cancelRequest));
+    await prefs.setStringList('cancel_requests', cancelRequests);
+
+    debugPrint('✅ Cancel request created for order $orderId');
+    _orderStreamController.add(null);
+  }
+
+  // Update order status to failed after cancellation is approved
+  static Future<void> updateOrderStatus(String orderId, String newStatus) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Update in driver_bids
+    final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    final updatedDriverBids = driverBids.map((bidJson) {
+      final bid = jsonDecode(bidJson) as Map<String, dynamic>;
+      if (bid['orderId'] == orderId) {
+        bid['status'] = newStatus;
+        debugPrint('📝 Updated order $orderId status to $newStatus in driver_bids');
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_driverBidsKey, updatedDriverBids);
+
+    // Update in shipper_received_bids
+    final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    final updatedShipperBids = shipperBids.map((bidJson) {
+      final bid = jsonDecode(bidJson) as Map<String, dynamic>;
+      if (bid['orderId'] == orderId) {
+        bid['status'] = newStatus;
+        debugPrint('📝 Updated order $orderId status to $newStatus in shipper_received_bids');
+      }
+      return jsonEncode(bid);
+    }).toList();
+    await prefs.setStringList(_shipperReceivedBidsKey, updatedShipperBids);
+
+    _orderStreamController.add(null);
   }
 }

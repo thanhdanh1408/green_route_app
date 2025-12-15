@@ -397,6 +397,17 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
           style: TextStyle(color: Colors.white),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateEmptyTripScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -410,17 +421,6 @@ class _DriverEmptyTripsScreenState extends State<DriverEmptyTripsScreen> with Si
                       const Text(
                         'Bạn chưa tạo chuyến ghép hàng nào',
                         style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const CreateEmptyTripScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Tạo chuyến mới'),
                       ),
                     ],
                   ),

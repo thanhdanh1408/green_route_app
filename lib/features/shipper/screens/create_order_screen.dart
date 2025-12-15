@@ -229,6 +229,18 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       return;
     }
 
+    // Ensure locations are selected before submitting
+    if (_selectedFromProvince == null || _selectedToProvince == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng chọn cả điểm nhận và điểm giao hàng'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _loading = false);
+      return;
+    }
+
     // ĐĂNG ĐƠN
     final prefs = await SharedPreferences.getInstance();
     final shipperPhone = prefs.getString('user_phone') ?? '';
@@ -246,8 +258,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     
     OrderPoolService.instance.addOrder(
       type: OrderType.normal,
-      from: _selectedFromProvince ?? 'Gia Lai',  // Province name only
-      to: _selectedToProvince ?? 'Đắk Lắk',      // Province name only
+      from: _selectedFromProvince!,  // Province name only
+      to: _selectedToProvince!,      // Province name only
       goods: _goodsCtrl.text,
       weight: _weightCtrl.text,
       price: _priceCtrl.text,

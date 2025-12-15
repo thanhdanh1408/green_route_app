@@ -116,23 +116,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
       floatingActionButton: Stack(
         children: [
-          // Tạo chuyến ghép hàng button (chỉ hiển thị ở tab 1)
-          if (_currentIndex == 1)
-            Positioned(
-              bottom: 0,
-              right: 16,
-              child: FloatingActionButton(
-                backgroundColor: AppColors.primary,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CreateEmptyTripScreen()),
-                  );
-                },
-                tooltip: 'Tạo chuyến ghép hàng',
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
           // Chatbot button (luôn ở góc phải dưới)
           Positioned(
             bottom: 16,

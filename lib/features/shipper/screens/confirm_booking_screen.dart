@@ -43,9 +43,15 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
     final cleanPrice = priceStr.replaceAll(RegExp(r'[^\d]'), '');
     _priceCtrl.text = cleanPrice.isEmpty ? '0' : cleanPrice;
     
-    // Initialize default coordinates
-    _fromCoordinates = const LatLng(13.9833, 108.0000); // Pleiku, Gia Lai
-    _toCoordinates = const LatLng(12.6667, 108.0500);   // Buôn Ma Thuột, Đắk Lắk
+    // Parse driver route to extract from/to provinces
+    final driverRoute = widget.driver['route']?.toString() ?? 'Gia Lai → Đắk Lắk';
+    final routeParts = driverRoute.split('→');
+    final driverFromProvince = routeParts.isNotEmpty ? routeParts[0].trim() : 'Gia Lai';
+    final driverToProvince = routeParts.length > 1 ? routeParts[1].trim() : 'Đắk Lắk';
+    
+    // Initialize coordinates from driver's provinces
+    _fromCoordinates = VietnamLocationsService.getProvinceCoordinates(driverFromProvince);
+    _toCoordinates = VietnamLocationsService.getProvinceCoordinates(driverToProvince);
   }
 
   @override
@@ -202,8 +208,8 @@ class _ConfirmBookingScreenState extends State<ConfirmBookingScreen> {
       shipperId: shipperId,
       shipperName: shipperName,
       shipperPhone: shipperId,
-      from: '${widget.driver['route']?.toString().split('→')[0].trim() ?? ''}',
-      to: '${widget.driver['route']?.toString().split('→').last.trim() ?? ''}',
+      from: _selectedFromProvince ?? 'Không rõ',
+      to: _selectedToProvince ?? 'Không rõ',
       fromDetail: _fromCtrl.text.trim(),
       toDetail: _toCtrl.text.trim(),
       goods: _goodsCtrl.text.trim(),

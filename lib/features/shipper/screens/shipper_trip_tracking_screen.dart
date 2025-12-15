@@ -2,9 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/mapbox_routing_service.dart';
 
 class ShipperTripTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -29,113 +28,52 @@ class _ShipperTripTrackingScreenState extends State<ShipperTripTrackingScreen> {
     final start = widget.order['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
     final end = widget.order['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
 
-    // Multiple OSRM servers for reliability
-    final osrmServers = [
-      'https://router.project-osrm.org',  // Primary (HTTPS)
-      'http://router.project-osrm.org',   // HTTP fallback
-      'https://routing.openstreetmap.de', // European backup
-    ];
+    debugPrint('🗺️ [Mapbox-Shipper] Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
 
-    debugPrint('🗺️ [OSRM-Shipper] Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
-
-    for (var i = 0; i < osrmServers.length; i++) {
-      try {
-        final server = osrmServers[i];
-        final url = '$server/route/v1/driving/'
-            '${start.longitude},${start.latitude};'
-            '${end.longitude},${end.latitude}'
-            '?overview=full&geometries=geojson';
-
-        debugPrint('🔄 [OSRM-Shipper] Trying server ${i + 1}/${osrmServers.length}: $server');
-        
-        final response = await http.get(Uri.parse(url)).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('⏱️ [OSRM-Shipper] Timeout on server ${i + 1}');
-            throw Exception('Timeout');
-          },
-        );
-
-        if (response.statusCode == 200) {
-          try {
-            final data = json.decode(response.body);
-            
-            if (data['routes'] == null || (data['routes'] as List).isEmpty) {
-              debugPrint('⚠️ [OSRM-Shipper] No routes found');
-              continue;
-            }
-            
-            final route = data['routes'][0];
-            final geometry = route['geometry'];
-            
-            if (geometry == null || geometry['coordinates'] == null) {
-              debugPrint('⚠️ [OSRM-Shipper] Invalid geometry');
-              continue;
-            }
-            
-            final coords = geometry['coordinates'] as List;
-            
-            if (coords.isEmpty) {
-              debugPrint('⚠️ [OSRM-Shipper] Empty coordinates');
-              continue;
-            }
-
-            // Convert GeoJSON [lng, lat] to LatLng [lat, lng]
-            List<LatLng> points = [];
-            for (var coord in coords) {
-              try {
-                final lat = (coord[1] as num).toDouble();
-                final lng = (coord[0] as num).toDouble();
-                points.add(LatLng(lat, lng));
-              } catch (e) {
-                continue;
-              }
-            }
-
-            if (points.isEmpty) {
-              debugPrint('⚠️ [OSRM-Shipper] No valid coordinates parsed');
-              continue;
-            }
-
-            if (!mounted) return;
-            setState(() {
-              routePoints = points;
-              isLoadingRoute = false;
-            });
-
-            debugPrint('✅ [OSRM-Shipper] Loaded route with ${routePoints.length} points');
-            return;
-          } catch (parseError) {
-            debugPrint('❌ [OSRM-Shipper] Parse error: $parseError');
-            continue;
-          }
-        } else {
-          debugPrint('⚠️ [OSRM-Shipper] Server returned ${response.statusCode}');
-          continue;
-        }
-      } catch (e) {
-        debugPrint('❌ [OSRM-Shipper] Error: $e');
-        continue;
+    try {
+      final points = await MapboxRoutingService.getRoute(start, end);
+      
+      if (points.isEmpty) {
+        debugPrint('⚠️ [Mapbox-Shipper] Empty route, using fallback');
+        _useFallbackRoute(start, end);
+        return;
       }
-    }
 
-    // All servers failed
-    debugPrint('❌ [OSRM-Shipper] All servers failed, using fallback');
-    _useFallbackRoute(start, end);
+      if (!mounted) return;
+      setState(() {
+        routePoints = points;
+        isLoadingRoute = false;
+      });
+
+      debugPrint('✅ [Mapbox-Shipper] Loaded route with ${routePoints.length} points');
+    } catch (e) {
+      debugPrint('❌ [Mapbox-Shipper] Error: $e, using fallback');
+      _useFallbackRoute(start, end);
+    }
   }
 
   void _useFallbackRoute(LatLng start, LatLng end) {
     if (!mounted) return;
     
+    // Improved fallback: interpolate 5+ waypoints instead of just 3
+    final points = <LatLng>[];
+    points.add(start);
+    
+    const int waypoints = 6; // 6 waypoints = 5 segments
+    for (int i = 1; i < waypoints; i++) {
+      final t = i / waypoints;
+      final lat = start.latitude + (end.latitude - start.latitude) * t;
+      final lng = start.longitude + (end.longitude - start.longitude) * t;
+      points.add(LatLng(lat, lng));
+    }
+    
+    points.add(end);
+    
     setState(() {
-      routePoints = [
-        start,
-        LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2),
-        end,
-      ];
+      routePoints = points;
       isLoadingRoute = false;
     });
-    debugPrint('⚠️ [Shipper] Using fallback route');
+    debugPrint('⚠️ [Mapbox-Shipper] Using improved fallback route with ${points.length} waypoints');
   }
 
   // BUILD MAP WITH DYNAMIC MARKERS AND ROUTE

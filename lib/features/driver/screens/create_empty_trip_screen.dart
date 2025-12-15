@@ -132,8 +132,11 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                         const Icon(Icons.local_shipping,
                             color: AppColors.primary),
                         const SizedBox(width: 8),
-                        Text('Biển số xe: $_licensePlate',
-                            style: const TextStyle(fontSize: 14)),
+                        Expanded(
+                          child: Text('Biển số xe: $_licensePlate',
+                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -141,8 +144,11 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                       children: [
                         const Icon(Icons.category, color: AppColors.primary),
                         const SizedBox(width: 8),
-                        Text('Loại xe: $_vehicleType',
-                            style: const TextStyle(fontSize: 14)),
+                        Expanded(
+                          child: Text('Loại xe: $_vehicleType',
+                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -150,8 +156,11 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                       children: [
                         const Icon(Icons.scale, color: AppColors.primary),
                         const SizedBox(width: 8),
-                        Text('Tải trọng tối đa: $_maxLoad',
-                            style: const TextStyle(fontSize: 14)),
+                        Expanded(
+                          child: Text('Tải trọng tối đa: $_maxLoad',
+                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                     ),
                   ],
@@ -253,15 +262,18 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                       const Icon(Icons.calendar_today,
                           color: AppColors.primary),
                       const SizedBox(width: 12),
-                      Text(
-                        _pickupTime == null
-                            ? 'Chọn ngày giờ khởi hành'
-                            : DateFormat('dd/MM/yyyy HH:mm')
-                                .format(_pickupTime!),
-                        style: TextStyle(
-                            color: _pickupTime == null
-                                ? Colors.grey
-                                : Colors.black),
+                      Expanded(
+                        child: Text(
+                          _pickupTime == null
+                              ? 'Chọn ngày giờ khởi hành'
+                              : DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(_pickupTime!),
+                          style: TextStyle(
+                              color: _pickupTime == null
+                                  ? Colors.grey
+                                  : Colors.black),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -287,15 +299,18 @@ class _CreateEmptyTripScreenState extends State<CreateEmptyTripScreen> {
                       const Icon(Icons.calendar_today,
                           color: AppColors.primary),
                       const SizedBox(width: 12),
-                      Text(
-                        _deliveryTime == null
-                            ? 'Chọn ngày giờ giao hàng'
-                            : DateFormat('dd/MM/yyyy HH:mm')
-                                .format(_deliveryTime!),
-                        style: TextStyle(
-                            color: _deliveryTime == null
-                                ? Colors.grey
-                                : Colors.black),
+                      Expanded(
+                        child: Text(
+                          _deliveryTime == null
+                              ? 'Chọn ngày giờ giao hàng'
+                              : DateFormat('dd/MM/yyyy HH:mm')
+                                  .format(_deliveryTime!),
+                          style: TextStyle(
+                              color: _deliveryTime == null
+                                  ? Colors.grey
+                                  : Colors.black),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),

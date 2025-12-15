@@ -87,8 +87,12 @@ class EmptyTrip {
       'maxShippers': maxShippers,
       'joinedShippers': joinedShippers.map((s) => s.toMap()).toList(),
       'status': status,
-      'fromLatLng': fromLatLng != null ? {'lat': fromLatLng!.latitude, 'lng': fromLatLng!.longitude} : null,
-      'toLatLng': toLatLng != null ? {'lat': toLatLng!.latitude, 'lng': toLatLng!.longitude} : null,
+      'fromLatLng': fromLatLng != null
+          ? {'lat': fromLatLng!.latitude, 'lng': fromLatLng!.longitude}
+          : null,
+      'toLatLng': toLatLng != null
+          ? {'lat': toLatLng!.latitude, 'lng': toLatLng!.longitude}
+          : null,
     };
   }
 
@@ -117,8 +121,10 @@ class EmptyTrip {
       containerType: map['containerType'] ?? '',
       capacity: map['capacity'] ?? '',
       proposedPrice: map['proposedPrice'] ?? '',
-      pickupTime: DateTime.parse(map['pickupTime'] ?? DateTime.now().toIso8601String()),
-      deliveryTime: DateTime.parse(map['deliveryTime'] ?? DateTime.now().toIso8601String()),
+      pickupTime:
+          DateTime.parse(map['pickupTime'] ?? DateTime.now().toIso8601String()),
+      deliveryTime: DateTime.parse(
+          map['deliveryTime'] ?? DateTime.now().toIso8601String()),
       maxShippers: map['maxShippers'] as int? ?? 0,
       joinedShippers: (map['joinedShippers'] as List<dynamic>?)
               ?.map((s) => ShipperInTrip.fromMap(s as Map<String, dynamic>))
@@ -173,6 +179,8 @@ class ShipperInTrip {
   final String toDetail; // Địa điểm giao hàng cụ thể
   final DateTime joinedAt;
   final String status; // 'pending' | 'approved' | 'picked' | 'delivered'
+  final LatLng? fromLatLng; // GPS coordinates for FROM location
+  final LatLng? toLatLng; // GPS coordinates for TO location
 
   ShipperInTrip({
     required this.shipperId,
@@ -184,6 +192,8 @@ class ShipperInTrip {
     this.fromDetail = '',
     this.toDetail = '',
     this.status = 'pending',
+    this.fromLatLng,
+    this.toLatLng,
   }) : joinedAt = DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -198,10 +208,28 @@ class ShipperInTrip {
       'toDetail': toDetail,
       'joinedAt': joinedAt.toIso8601String(),
       'status': status,
+      'fromLatLng': fromLatLng != null
+          ? {'lat': fromLatLng!.latitude, 'lng': fromLatLng!.longitude}
+          : null,
+      'toLatLng': toLatLng != null
+          ? {'lat': toLatLng!.latitude, 'lng': toLatLng!.longitude}
+          : null,
     };
   }
 
   factory ShipperInTrip.fromMap(Map<String, dynamic> map) {
+    LatLng? parseLatLng(dynamic data) {
+      if (data == null) return null;
+      try {
+        if (data is Map) {
+          return LatLng(data['lat'] as double, data['lng'] as double);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error parsing ShipperInTrip LatLng: $e');
+      }
+      return null;
+    }
+
     return ShipperInTrip(
       shipperId: map['shipperId'] ?? '',
       shipperName: map['shipperName'] ?? '',
@@ -212,6 +240,8 @@ class ShipperInTrip {
       fromDetail: map['fromDetail'] ?? '',
       toDetail: map['toDetail'] ?? '',
       status: map['status'] as String? ?? 'pending',
+      fromLatLng: parseLatLng(map['fromLatLng']),
+      toLatLng: parseLatLng(map['toLatLng']),
     );
   }
 }

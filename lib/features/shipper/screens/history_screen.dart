@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/vietnam_coordinates.dart';
 import '../widgets/history_card.dart';
 import '../../driver/services/order_status_service.dart';
 import 'shipper_trip_tracking_screen.dart';
@@ -117,6 +118,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // Hiển thị đúng trạng thái dựa vào bid status
       final isCompleted = bid['status'] == 'completed';
       
+      // 📍 Parse coordinates from bid data
+      LatLng? fromLatLng;
+      LatLng? toLatLng;
+      
+      if (bid['fromLatLng'] != null && bid['fromLatLng'] is Map) {
+        final fromMap = bid['fromLatLng'] as Map<String, dynamic>;
+        fromLatLng = LatLng(fromMap['lat'] as double, fromMap['lng'] as double);
+      }
+      
+      if (bid['toLatLng'] != null && bid['toLatLng'] is Map) {
+        final toMap = bid['toLatLng'] as Map<String, dynamic>;
+        toLatLng = LatLng(toMap['lat'] as double, toMap['lng'] as double);
+      }
+      
+      // 📍 Fallback: Use province names to get coordinates if not in bid data
+      fromLatLng ??= VietnamCoordinates.getCoordinatesOrDefault(bid['from'] ?? '');
+      toLatLng ??= VietnamCoordinates.getCoordinatesOrDefault(bid['to'] ?? '');
+      
       return {
         'id': bid['orderId'],
         'tripType': 'regular',
@@ -133,6 +152,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         'status': isCompleted ? 'Hoàn thành' : 'Đang giao hàng',
         'statusColor': isCompleted ? Colors.green : Colors.orange,
         'date': DateTime.now().toString().split(' ')[0],
+        // 📍 Include coordinates in the map
+        'fromLatLng': fromLatLng,
+        'toLatLng': toLatLng,
       };
     }).toList();
 

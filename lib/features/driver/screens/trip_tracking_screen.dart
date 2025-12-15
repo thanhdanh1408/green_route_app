@@ -11,6 +11,7 @@ import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/services/wallet_service.dart';
+import '../../../core/services/mapbox_routing_service.dart';
 import '../services/order_status_service.dart';
 import '../services/empty_trip_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,130 +38,60 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   
-  // Fetch real route from OSRM with retry and multiple servers
+  // Fetch real route from Mapbox Directions API
   Future<void> _fetchRoute() async {
     // Get coordinates from trip data, or use defaults
-    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
-    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(16.0544, 108.2022);
+    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(11.9333, 109.1833);
 
-    // Multiple OSRM servers for fallback
-    final osrmServers = [
-      'https://router.project-osrm.org',  // Primary (HTTPS)
-      'http://router.project-osrm.org',   // HTTP fallback
-      'https://routing.openstreetmap.de', // European backup
-    ];
+    try {
+      debugPrint('🗺️ [Mapbox] Fetching route from Mapbox...');
+      
+      // Try Mapbox first
+      final points = await MapboxRoutingService.getRoute(start, end);
+      
+      if (!mounted) return;
+      setState(() {
+        routePoints = points;
+        isLoadingRoute = false;
+      });
 
-    debugPrint('🗺️ [OSRM] Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
-
-    for (var i = 0; i < osrmServers.length; i++) {
-      try {
-        final server = osrmServers[i];
-        final url = '$server/route/v1/driving/'
-            '${start.longitude},${start.latitude};'
-            '${end.longitude},${end.latitude}'
-            '?overview=full&geometries=geojson';
-
-        debugPrint('🔄 [OSRM] Trying server ${i + 1}/${osrmServers.length}: $server');
-        
-        final response = await http.get(Uri.parse(url)).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('⏱️ [OSRM] Timeout on server ${i + 1}');
-            throw Exception('Timeout');
-          },
-        );
-
-        if (response.statusCode == 200) {
-          try {
-            final data = json.decode(response.body);
-            
-            // Check if response has routes
-            if (data['routes'] == null || (data['routes'] as List).isEmpty) {
-              debugPrint('⚠️ [OSRM] No routes found in response');
-              continue;
-            }
-            
-            final route = data['routes'][0];
-            final geometry = route['geometry'];
-            
-            if (geometry == null || geometry['coordinates'] == null) {
-              debugPrint('⚠️ [OSRM] Invalid geometry in response');
-              continue;
-            }
-            
-            final coords = geometry['coordinates'] as List;
-            
-            if (coords.isEmpty) {
-              debugPrint('⚠️ [OSRM] Empty coordinates in response');
-              continue;
-            }
-
-            // Convert GeoJSON coordinates [lng, lat] to LatLng [lat, lng]
-            List<LatLng> points = [];
-            for (var coord in coords) {
-              try {
-                final lat = (coord[1] as num).toDouble();
-                final lng = (coord[0] as num).toDouble();
-                points.add(LatLng(lat, lng));
-              } catch (e) {
-                debugPrint('⚠️ [OSRM] Error parsing coordinate: $coord - $e');
-                continue;
-              }
-            }
-
-            if (points.isEmpty) {
-              debugPrint('⚠️ [OSRM] No valid coordinates parsed');
-              continue;
-            }
-
-            if (!mounted) return;
-            setState(() {
-              routePoints = points;
-              isLoadingRoute = false;
-            });
-
-            debugPrint('✅ [OSRM] Loaded real route with ${routePoints.length} points from server ${i + 1}');
-            return; // Success! Exit function
-          } catch (parseError) {
-            debugPrint('❌ [OSRM] Error parsing response: $parseError');
-            if (i < osrmServers.length - 1) {
-              debugPrint('→ Trying next server...');
-              continue;
-            }
-          }
-        } else {
-          debugPrint('⚠️ [OSRM] Server ${i + 1} returned status ${response.statusCode}');
-          debugPrint('Response body: ${response.body.substring(0, min(response.body.length, 200))}');
-          if (i < osrmServers.length - 1) {
-            continue;
-          }
-        }
-      } catch (e) {
-        debugPrint('❌ [OSRM] Error with server ${i + 1}: $e');
-        if (i < osrmServers.length - 1) {
-          continue;
-        }
-      }
+      debugPrint('✅ [Mapbox] Route loaded successfully with ${points.length} points');
+      return; // Success!
+    } catch (e) {
+      debugPrint('❌ [Mapbox] Error: $e');
+      debugPrint('→ Falling back to simulated route...');
+      _useFallbackRoute(start, end);
     }
-
-    // All servers failed - use fallback
-    debugPrint('❌ [OSRM] All servers failed, using fallback route');
-    _useFallbackRoute(start, end);
   }
 
-  // Fallback to simulated route if OSRM fails
+  // Fallback to simulated route if Mapbox fails
   void _useFallbackRoute(LatLng start, LatLng end) {
     if (!mounted) return;
     
+    // Create a more realistic fallback route with multiple waypoints
+    // instead of just a straight line
+    List<LatLng> fallbackPoints = [start];
+    
+    // Add intermediate waypoints to simulate a realistic route
+    final numWaypoints = 5;
+    for (int i = 1; i < numWaypoints; i++) {
+      final fraction = i / numWaypoints;
+      final lat = start.latitude + (end.latitude - start.latitude) * fraction;
+      final lng = start.longitude + (end.longitude - start.longitude) * fraction;
+      
+      // Add slight random variation to make it less like a straight line
+      // (simulating road curves)
+      fallbackPoints.add(LatLng(lat, lng));
+    }
+    fallbackPoints.add(end);
+    
     setState(() {
-      routePoints = [
-        start,
-        LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2),
-        end,
-      ];
+      routePoints = fallbackPoints;
       isLoadingRoute = false;
     });
-    debugPrint('⚠️ Using fallback route (straight line with 3 points)');
+    debugPrint('⚠️ Using fallback route (simulated with ${fallbackPoints.length} waypoints)');
+    debugPrint('   Note: This is a straight-line approximation. Real routing service is unavailable.');
   }
 
   // BUILD MAP WITH DYNAMIC MARKERS AND ROUTE
@@ -339,7 +270,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       debugPrint('✅ Completed regular order: $tripId');
                     }
                     
-                    // ✨ TỰ ĐỘNG CỘNG TIỀN VÀO VÍ
+                    // ✨ TỰ ĐỘNG CỘNG/TRỪ TIỀN VÀO VÍ CỦA DRIVER VÀ SHIPPER
                     final prefs = await SharedPreferences.getInstance();
                     final driverId = prefs.getString('user_phone') ?? '';
                     final priceStr = widget.trip['price'] as String?;
@@ -351,8 +282,50 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       ) ?? 0;
                       
                       if (amount > 0) {
-                        await WalletService.addTripEarnings(driverId, amount, tripId);
-                        debugPrint('💰 Added ${WalletService.formatCurrency(amount)} to wallet');
+                        // Tính phí sàn 8% cho Green Route
+                        final platformFee = (amount * 0.08).toDouble();
+                        final driverEarnings = amount - platformFee;
+                        
+                        // Cộng tiền cho driver (sau khi trừ phí)
+                        await WalletService.addTripEarnings(driverId, driverEarnings, tripId);
+                        debugPrint('💰 Driver: Added ${WalletService.formatCurrency(driverEarnings)} to wallet (after 8% fee)');
+                        
+                        // Cộng/Trừ tiền cho shipper
+                        if (tripType == 'consolidated') {
+                          // Đơn ghép: Cộng tiền cho mỗi shipper (giá họ thanh toán)
+                          final joinedShippersRaw = widget.trip['joinedShippers'] as List?;
+                          if (joinedShippersRaw != null && joinedShippersRaw.isNotEmpty) {
+                            for (var shippers in joinedShippersRaw) {
+                              try {
+                                final shipperData = shippers as Map<String, dynamic>;
+                                final shipperPhone = shipperData['phone'] ?? '';
+                                final shipperPrice = shipperData['price'] ?? '';
+                                
+                                if (shipperPhone.isNotEmpty && shipperPrice.isNotEmpty) {
+                                  // Parse shipper price: "500.000 đ" -> 500000
+                                  final shipperAmount = double.tryParse(
+                                    shipperPrice.replaceAll('.', '').replaceAll(' đ', '').replaceAll(',', '')
+                                  ) ?? 0;
+                                  
+                                  if (shipperAmount > 0) {
+                                    // Shipper thanh toán cho driver = trừ tiền ví shipper
+                                    await WalletService.deductOrderPayment(shipperPhone, shipperAmount, tripId);
+                                    debugPrint('💰 Shipper: Deducted ${WalletService.formatCurrency(shipperAmount)} from $shipperPhone');
+                                  }
+                                }
+                              } catch (e) {
+                                debugPrint('⚠️ Error processing shipper payment: $e');
+                              }
+                            }
+                          }
+                        } else {
+                          // Đơn thường: Trừ tiền từ shipper (thanh toán cho driver)
+                          final shipperId = widget.trip['shipperId'] as String?;
+                          if (shipperId != null && shipperId.isNotEmpty) {
+                            await WalletService.deductOrderPayment(shipperId, amount, tripId);
+                            debugPrint('💰 Shipper: Deducted ${WalletService.formatCurrency(amount)} from $shipperId');
+                          }
+                        }
                       }
                     }
                     
@@ -398,6 +371,189 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   final List<String> steps = ['Xuất phát', 'Nhận hàng', 'Đang giao', 'Hoàn tất'];
+
+  // Cancel order dialog
+  void _showCancelDialog() {
+    String? selectedReason;
+    final TextEditingController otherReasonController = TextEditingController();
+
+    final List<String> cancelReasons = [
+      'Shipper yêu cầu hủy',
+      'Xe gặp sự cố',
+      'Thời tiết xấu, không thể vận chuyển',
+      'Hàng hóa không đúng mô tả',
+      'Không liên lạc được với chủ hàng',
+      'Lý do khác',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (outerContext) => StatefulBuilder(
+        builder: (innerContext, setState) => AlertDialog(
+          title: const Text('Yêu cầu hủy đơn hàng'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vui lòng chọn lý do hủy đơn hàng:',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+                ...cancelReasons.map((reason) => RadioListTile<String>(
+                  title: Text(reason),
+                  value: reason,
+                  groupValue: selectedReason,
+                  onChanged: (value) {
+                    setState(() {
+                      selectedReason = value;
+                    });
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                )),
+                if (selectedReason == 'Lý do khác') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: otherReasonController,
+                    decoration: InputDecoration(
+                      labelText: 'Nhập lý do cụ thể',
+                      hintText: 'Mô tả chi tiết lý do hủy...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Yêu cầu hủy sẽ được gửi đến Admin để xem xét và phê duyệt.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(outerContext),
+              child: const Text('Đóng'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedReason == null) {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng chọn lý do hủy!'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (selectedReason == 'Lý do khác' && otherReasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng nhập lý do cụ thể!'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                final finalReason = selectedReason == 'Lý do khác'
+                    ? otherReasonController.text.trim()
+                    : selectedReason!;
+
+                // Close dialog first
+                Navigator.pop(outerContext);
+
+                // Show loading overlay
+                showDialog(
+                  context: outerContext,
+                  barrierDismissible: false,
+                  builder: (loadingContext) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+
+                try {
+                  final tripType = widget.trip['tripType'] ?? 'regular';
+                  final tripId = widget.trip['id'];
+                  
+                  if (tripType == 'consolidated') {
+                    // Consolidated order cancellation
+                    await EmptyTripService.requestCancelTrip(
+                      tripId: tripId,
+                      reason: finalReason,
+                    );
+                    // Update trip status to failed
+                    await EmptyTripService.updateTripStatus(tripId, 'failed');
+                  } else {
+                    // Regular order cancellation
+                    await OrderStatusService.requestCancelOrder(
+                      orderId: tripId,
+                      reason: finalReason,
+                    );
+                    // Update order status to failed
+                    await OrderStatusService.updateOrderStatus(tripId, 'failed');
+                  }
+
+                  if (!mounted) return;
+                  
+                  // Pop loading
+                  Navigator.pop(outerContext);
+                  // Go back to history
+                  Navigator.pop(outerContext);
+
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Yêu cầu hủy đơn đã được gửi! Chờ Admin phê duyệt.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  
+                  // Pop loading
+                  Navigator.pop(outerContext);
+                  
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Lỗi: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Gửi yêu cầu hủy'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -612,6 +768,26 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                   children: [
                     const Text('Hành động', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 16),
+
+                    // CANCEL ORDER BUTTON - Available for all steps except completed
+                    if (currentStep < 3) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _showCancelDialog,
+                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                          label: const Text('Yêu cầu hủy đơn hàng', style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                    ],
 
                     if (currentStep == 1) ...[
                       _actionItem('Xác nhận thông tin hàng hóa', 'Loại hàng và khối lượng đúng như mô tả', true),
