@@ -31,21 +31,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_phone') ?? '';
+    
+    // 🔒 Load from user-specific keys, fallback to global keys
+    var userName = userId.isNotEmpty ? prefs.getString('user_name_$userId') : null;
+    var address = userId.isNotEmpty ? prefs.getString('address_$userId') : null;
+    var company = userId.isNotEmpty ? prefs.getString('company_$userId') : null;
+    
+    // Fallback to global keys
+    userName ??= prefs.getString('user_name');
+    address ??= prefs.getString('address');
+    company ??= prefs.getString('company');
+    
     setState(() {
-      nameController.text = prefs.getString('user_name') ?? '';
-      phoneController.text = prefs.getString('user_phone') ?? '';
-      addressController.text = prefs.getString('address') ?? '';
-      companyController.text = prefs.getString('company') ?? '';
+      nameController.text = userName ?? '';
+      phoneController.text = userId;
+      addressController.text = address ?? '';
+      companyController.text = company ?? '';
     });
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_phone') ?? '';
+      
+      // Save to global keys
       await prefs.setString('user_name', nameController.text.trim());
-      // Phone is read-only for security
       await prefs.setString('address', addressController.text.trim());
       await prefs.setString('company', companyController.text.trim());
+      
+      // 🔒 Also save to user-specific keys for consistency with admin queries
+      if (userId.isNotEmpty) {
+        await prefs.setString('user_name_$userId', nameController.text.trim());
+        await prefs.setString('address_$userId', addressController.text.trim());
+        await prefs.setString('company_$userId', companyController.text.trim());
+        debugPrint('✅ Saved shipper profile to both global and user-specific keys');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

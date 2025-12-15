@@ -6,6 +6,7 @@ import '../../auth/screens/login_screen.dart';
 import 'pending_verifications_screen.dart';
 import 'approved_documents_screen.dart';
 import 'rejected_documents_screen.dart';
+import 'cancel_requests_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -37,12 +38,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
-    
+
     setState(() => _isLoggingOut = true);
-    
+
     try {
       await AuthService.instance.logout();
-      
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -67,7 +68,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       barrierDismissible: !_isLoggingOut,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Đăng xuất'),
-        content: _isLoggingOut 
+        content: _isLoggingOut
             ? const Row(
                 children: [
                   SizedBox(
@@ -87,10 +88,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: const Text('Hủy'),
             ),
           ElevatedButton(
-            onPressed: _isLoggingOut ? null : () {
-              Navigator.pop(dialogContext); // Close dialog
-              _handleLogout(); // Logout using screen context
-            },
+            onPressed: _isLoggingOut
+                ? null
+                : () {
+                    Navigator.pop(dialogContext); // Close dialog
+                    _handleLogout(); // Logout using screen context
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -106,7 +109,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quản lý Admin', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Quản lý Admin', style: TextStyle(color: Colors.white)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
@@ -151,7 +155,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.7)
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -235,6 +242,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                   );
                   _loadPendingCount();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              _AdminCard(
+                icon: Icons.cancel_presentation,
+                title: 'Yêu cầu hủy đơn',
+                subtitle: 'Quản lý yêu cầu hủy đơn hàng',
+                color: Colors.orange,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CancelRequestsScreen(),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 12),

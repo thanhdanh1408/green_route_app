@@ -59,6 +59,31 @@ class BookingService {
     bookings.add(jsonEncode(booking));
     await prefs.setStringList(_bookingRequestsKey, bookings);
     
+    // ALSO ADD TO shipper_received_bids so shipper can see it in their orders as pending
+    const shipperBidsKey = 'shipper_received_bids';
+    final shipperBids = prefs.getStringList(shipperBidsKey) ?? [];
+    final bid = {
+      'orderId': bookingId,
+      'driverId': driverId,
+      'driverName': driverName,
+      'driverPhone': driverPhone,
+      'bidPrice': totalPrice,
+      'status': 'pending', // Pending until driver accepts
+      'from': from,
+      'to': to,
+      'goods': goods,
+      'weight': weight,
+      'shipperId': shipperPhone,
+      'shipperName': shipperName,
+      'shipperPhone': shipperPhone,
+      'fromDetail': fromDetail,
+      'toDetail': toDetail,
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+    shipperBids.add(jsonEncode(bid));
+    await prefs.setStringList(shipperBidsKey, shipperBids);
+    debugPrint('  ✓ Added to shipper_received_bids as pending booking');
+    
     debugPrint('✅ Created booking request: $bookingId for driver $driverId');
     return bookingId;
   }

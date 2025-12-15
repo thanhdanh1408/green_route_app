@@ -2,9 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/mapbox_routing_service.dart';
 
 class ShipperTripTrackingScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -25,45 +24,153 @@ class _ShipperTripTrackingScreenState extends State<ShipperTripTrackingScreen> {
   }
 
   Future<void> _fetchRoute() async {
-    const start = LatLng(13.9833, 108.0000);
-    const end = LatLng(12.6667, 108.0500);
+    // Get coordinates from order data with fallback defaults
+    final start = widget.order['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.order['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+
+    debugPrint('🗺️ [Mapbox-Shipper] Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
 
     try {
-      final url = 'http://router.project-osrm.org/route/v1/driving/'
-          '${start.longitude},${start.latitude};'
-          '${end.longitude},${end.latitude}'
-          '?overview=full&geometries=geojson';
-
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final coords = data['routes'][0]['geometry']['coordinates'] as List;
-
-        setState(() {
-          routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
-          isLoadingRoute = false;
-        });
-      } else {
-        _useFallbackRoute();
+      final points = await MapboxRoutingService.getRoute(start, end);
+      
+      if (points.isEmpty) {
+        debugPrint('⚠️ [Mapbox-Shipper] Empty route, using fallback');
+        _useFallbackRoute(start, end);
+        return;
       }
+
+      if (!mounted) return;
+      setState(() {
+        routePoints = points;
+        isLoadingRoute = false;
+      });
+
+      debugPrint('✅ [Mapbox-Shipper] Loaded route with ${routePoints.length} points');
     } catch (e) {
-      _useFallbackRoute();
+      debugPrint('❌ [Mapbox-Shipper] Error: $e, using fallback');
+      _useFallbackRoute(start, end);
     }
   }
 
-  void _useFallbackRoute() {
+  void _useFallbackRoute(LatLng start, LatLng end) {
+    if (!mounted) return;
+    
+    // Improved fallback: interpolate 5+ waypoints instead of just 3
+    final points = <LatLng>[];
+    points.add(start);
+    
+    const int waypoints = 6; // 6 waypoints = 5 segments
+    for (int i = 1; i < waypoints; i++) {
+      final t = i / waypoints;
+      final lat = start.latitude + (end.latitude - start.latitude) * t;
+      final lng = start.longitude + (end.longitude - start.longitude) * t;
+      points.add(LatLng(lat, lng));
+    }
+    
+    points.add(end);
+    
     setState(() {
-      routePoints = [
-        const LatLng(13.9833, 108.0000),
-        const LatLng(13.7, 108.02),
-        const LatLng(13.4, 108.05),
-        const LatLng(13.1, 108.06),
-        const LatLng(12.9, 108.055),
-        const LatLng(12.6667, 108.0500),
-      ];
+      routePoints = points;
       isLoadingRoute = false;
     });
+    debugPrint('⚠️ [Mapbox-Shipper] Using improved fallback route with ${points.length} waypoints');
+  }
+
+  // BUILD MAP WITH DYNAMIC MARKERS AND ROUTE
+  Widget _buildMapWidget() {
+    final start = widget.order['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.order['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+    
+    // Calculate center and zoom level based on route
+    final centerLat = (start.latitude + end.latitude) / 2;
+    final centerLng = (start.longitude + end.longitude) / 2;
+    
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: LatLng(centerLat, centerLng),
+        initialZoom: 9.0,
+      ),
+      children: [
+        // OpenStreetMap tiles
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.green_route_app',
+          maxNativeZoom: 19,
+          tileSize: 256,
+        ),
+        
+        // Route polyline
+        if (routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: AppColors.primary,
+                strokeWidth: 4,
+                borderColor: AppColors.primary.withOpacity(0.5),
+                borderStrokeWidth: 1,
+              ),
+            ],
+          ),
+        
+        // Start and End markers
+        MarkerLayer(
+          markers: [
+            // START MARKER
+            Marker(
+              point: start,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.green,
+                      boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.location_on, color: Colors.white, size: 24),
+                  ),
+                  const Text('Xuất phát', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            
+            // END MARKER
+            Marker(
+              point: end,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red,
+                      boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.flag, color: Colors.white, size: 24),
+                  ),
+                  const Text('Đích đến', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        // Loading indicator
+        if (isLoadingRoute)
+          const Positioned(
+            top: 12,
+            right: 12,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -84,55 +191,17 @@ class _ShipperTripTrackingScreenState extends State<ShipperTripTrackingScreen> {
           children: [
             // BẢN ĐỒ
             Container(
-              height: 300,
+              height: 350,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey[300]!),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, spreadRadius: 2),
+                ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: const LatLng(13.9833, 108.0000),
-                    initialZoom: 8.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.green_route_app',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: const LatLng(13.9833, 108.0000),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.location_on, color: Colors.green, size: 40),
-                        ),
-                        Marker(
-                          point: const LatLng(12.6667, 108.0500),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.flag, color: Colors.red, size: 40),
-                        ),
-                      ],
-                    ),
-                    if (routePoints.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: routePoints,
-                            color: AppColors.primary,
-                            strokeWidth: 4,
-                          ),
-                        ],
-                      ),
-                    if (isLoadingRoute)
-                      const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                  ],
-                ),
+                child: _buildMapWidget(),
               ),
             ),
             const SizedBox(height: 24),

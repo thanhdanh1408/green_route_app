@@ -1,5 +1,6 @@
 // lib/features/driver/screens/trip_tracking_screen.dart
 import 'dart:io';
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +11,7 @@ import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/services/wallet_service.dart';
+import '../../../core/services/mapbox_routing_service.dart';
 import '../services/order_status_service.dart';
 import '../services/empty_trip_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,86 +38,157 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   
-  // Fetch real route from OSRM with retry and multiple servers
+  // Fetch real route from Mapbox Directions API
   Future<void> _fetchRoute() async {
-    // Lấy coordinates thực từ trip data
-    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
-    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+    // Get coordinates from trip data, or use defaults
+    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(16.0544, 108.2022);
+    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(11.9333, 109.1833);
 
-    // Multiple OSRM servers for fallback
-    final osrmServers = [
-      'https://router.project-osrm.org',  // Primary (HTTPS)
-      'http://router.project-osrm.org',   // HTTP fallback
-      'https://routing.openstreetmap.de', // European backup
-    ];
+    try {
+      debugPrint('🗺️ [Mapbox] Fetching route from Mapbox...');
+      
+      // Try Mapbox first
+      final points = await MapboxRoutingService.getRoute(start, end);
+      
+      if (!mounted) return;
+      setState(() {
+        routePoints = points;
+        isLoadingRoute = false;
+      });
 
-    debugPrint('🗺️ Fetching route from ${start.latitude},${start.longitude} to ${end.latitude},${end.longitude}');
-
-    for (var i = 0; i < osrmServers.length; i++) {
-      try {
-        final server = osrmServers[i];
-        final url = '$server/route/v1/driving/'
-            '${start.longitude},${start.latitude};'
-            '${end.longitude},${end.latitude}'
-            '?overview=full&geometries=geojson';
-
-        debugPrint('  🔄 Trying server ${i + 1}/${osrmServers.length}: $server');
-        
-        final response = await http.get(Uri.parse(url)).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('  ⏱️ Timeout on server ${i + 1}');
-            throw Exception('Timeout');
-          },
-        );
-
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final coords = data['routes'][0]['geometry']['coordinates'] as List;
-
-          if (!mounted) return;
-          setState(() {
-            routePoints = coords.map((coord) => LatLng(coord[1], coord[0])).toList();
-            isLoadingRoute = false;
-          });
-
-          debugPrint('✅ Loaded real route with ${routePoints.length} points from server ${i + 1}');
-          return; // Success! Exit
-        } else {
-          debugPrint('  ⚠️ Server ${i + 1} returned status ${response.statusCode}');
-          if (i < osrmServers.length - 1) {
-            debugPrint('  → Trying next server...');
-            continue; // Try next server
-          }
-        }
-      } catch (e) {
-        debugPrint('  ❌ Error with server ${i + 1}: $e');
-        if (i < osrmServers.length - 1) {
-          debugPrint('  → Trying next server...');
-          continue; // Try next server
-        }
-      }
+      debugPrint('✅ [Mapbox] Route loaded successfully with ${points.length} points');
+      return; // Success!
+    } catch (e) {
+      debugPrint('❌ [Mapbox] Error: $e');
+      debugPrint('→ Falling back to simulated route...');
+      _useFallbackRoute(start, end);
     }
-
-    // All servers failed
-    debugPrint('❌ All OSRM servers failed, using fallback route');
-    _useFallbackRoute(start, end);
   }
 
-  // Fallback to simulated route if OSRM fails
+  // Fallback to simulated route if Mapbox fails
   void _useFallbackRoute(LatLng start, LatLng end) {
-    if (!mounted) return; // FIX: Check mounted trước khi setState
+    if (!mounted) return;
     
-    // Tạo route đơn giản bằng cách nội suy giữa start và end
+    // Create a more realistic fallback route with multiple waypoints
+    // instead of just a straight line
+    List<LatLng> fallbackPoints = [start];
+    
+    // Add intermediate waypoints to simulate a realistic route
+    final numWaypoints = 5;
+    for (int i = 1; i < numWaypoints; i++) {
+      final fraction = i / numWaypoints;
+      final lat = start.latitude + (end.latitude - start.latitude) * fraction;
+      final lng = start.longitude + (end.longitude - start.longitude) * fraction;
+      
+      // Add slight random variation to make it less like a straight line
+      // (simulating road curves)
+      fallbackPoints.add(LatLng(lat, lng));
+    }
+    fallbackPoints.add(end);
+    
     setState(() {
-      routePoints = [
-        start,
-        LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2),
-        end,
-      ];
+      routePoints = fallbackPoints;
       isLoadingRoute = false;
     });
-    debugPrint('⚠️ Using fallback route (straight line)');
+    debugPrint('⚠️ Using fallback route (simulated with ${fallbackPoints.length} waypoints)');
+    debugPrint('   Note: This is a straight-line approximation. Real routing service is unavailable.');
+  }
+
+  // BUILD MAP WITH DYNAMIC MARKERS AND ROUTE
+  Widget _buildMapWidget() {
+    final start = widget.trip['fromLatLng'] as LatLng? ?? const LatLng(13.9833, 108.0000);
+    final end = widget.trip['toLatLng'] as LatLng? ?? const LatLng(12.6667, 108.0500);
+    
+    // Calculate initial center and zoom level based on route
+    final centerLat = (start.latitude + end.latitude) / 2;
+    final centerLng = (start.longitude + end.longitude) / 2;
+    
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: LatLng(centerLat, centerLng),
+        initialZoom: 9.0,
+      ),
+      children: [
+        // OpenStreetMap tiles
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.green_route_app',
+          maxNativeZoom: 19,
+          tileSize: 256,
+        ),
+        
+        // Route polyline (if available)
+        if (routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: AppColors.primary,
+                strokeWidth: 4,
+                borderColor: AppColors.primary.withOpacity(0.5),
+                borderStrokeWidth: 1,
+              ),
+            ],
+          ),
+        
+        // Start and End markers with dynamic coordinates
+        MarkerLayer(
+          markers: [
+            // START MARKER (Green)
+            Marker(
+              point: start,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.green,
+                      boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.location_on, color: Colors.white, size: 24),
+                  ),
+                  const Text('Xuất phát', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            
+            // END MARKER (Red)
+            Marker(
+              point: end,
+              width: 50,
+              height: 50,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red,
+                      boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.5), blurRadius: 8)],
+                    ),
+                    child: const Icon(Icons.flag, color: Colors.white, size: 24),
+                  ),
+                  const Text('Đích đến', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        // Loading indicator
+        if (isLoadingRoute)
+          const Positioned(
+            top: 12,
+            right: 12,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+      ],
+    );
   }
 
   // CHỤP ẢNH
@@ -197,7 +270,7 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       debugPrint('✅ Completed regular order: $tripId');
                     }
                     
-                    // ✨ TỰ ĐỘNG CỘNG TIỀN VÀO VÍ
+                    // ✨ TỰ ĐỘNG CỘNG/TRỪ TIỀN VÀO VÍ CỦA DRIVER VÀ SHIPPER
                     final prefs = await SharedPreferences.getInstance();
                     final driverId = prefs.getString('user_phone') ?? '';
                     final priceStr = widget.trip['price'] as String?;
@@ -215,7 +288,44 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                         
                         // Cộng tiền cho driver (sau khi trừ phí)
                         await WalletService.addTripEarnings(driverId, driverEarnings, tripId);
-                        debugPrint('💰 Added ${WalletService.formatCurrency(driverEarnings)} to wallet (after 8% fee)');
+                        debugPrint('💰 Driver: Added ${WalletService.formatCurrency(driverEarnings)} to wallet (after 8% fee)');
+                        
+                        // Cộng/Trừ tiền cho shipper
+                        if (tripType == 'consolidated') {
+                          // Đơn ghép: Cộng tiền cho mỗi shipper (giá họ thanh toán)
+                          final joinedShippersRaw = widget.trip['joinedShippers'] as List?;
+                          if (joinedShippersRaw != null && joinedShippersRaw.isNotEmpty) {
+                            for (var shippers in joinedShippersRaw) {
+                              try {
+                                final shipperData = shippers as Map<String, dynamic>;
+                                final shipperPhone = shipperData['phone'] ?? '';
+                                final shipperPrice = shipperData['price'] ?? '';
+                                
+                                if (shipperPhone.isNotEmpty && shipperPrice.isNotEmpty) {
+                                  // Parse shipper price: "500.000 đ" -> 500000
+                                  final shipperAmount = double.tryParse(
+                                    shipperPrice.replaceAll('.', '').replaceAll(' đ', '').replaceAll(',', '')
+                                  ) ?? 0;
+                                  
+                                  if (shipperAmount > 0) {
+                                    // Shipper thanh toán cho driver = trừ tiền ví shipper
+                                    await WalletService.deductOrderPayment(shipperPhone, shipperAmount, tripId);
+                                    debugPrint('💰 Shipper: Deducted ${WalletService.formatCurrency(shipperAmount)} from $shipperPhone');
+                                  }
+                                }
+                              } catch (e) {
+                                debugPrint('⚠️ Error processing shipper payment: $e');
+                              }
+                            }
+                          }
+                        } else {
+                          // Đơn thường: Trừ tiền từ shipper (thanh toán cho driver)
+                          final shipperId = widget.trip['shipperId'] as String?;
+                          if (shipperId != null && shipperId.isNotEmpty) {
+                            await WalletService.deductOrderPayment(shipperId, amount, tripId);
+                            debugPrint('💰 Shipper: Deducted ${WalletService.formatCurrency(amount)} from $shipperId');
+                          }
+                        }
                       }
                     }
                     
@@ -261,6 +371,189 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
   }
 
   final List<String> steps = ['Xuất phát', 'Nhận hàng', 'Đang giao', 'Hoàn tất'];
+
+  // Cancel order dialog
+  void _showCancelDialog() {
+    String? selectedReason;
+    final TextEditingController otherReasonController = TextEditingController();
+
+    final List<String> cancelReasons = [
+      'Shipper yêu cầu hủy',
+      'Xe gặp sự cố',
+      'Thời tiết xấu, không thể vận chuyển',
+      'Hàng hóa không đúng mô tả',
+      'Không liên lạc được với chủ hàng',
+      'Lý do khác',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (outerContext) => StatefulBuilder(
+        builder: (innerContext, setState) => AlertDialog(
+          title: const Text('Yêu cầu hủy đơn hàng'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vui lòng chọn lý do hủy đơn hàng:',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+                ...cancelReasons.map((reason) => RadioListTile<String>(
+                  title: Text(reason),
+                  value: reason,
+                  groupValue: selectedReason,
+                  onChanged: (value) {
+                    setState(() {
+                      selectedReason = value;
+                    });
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                )),
+                if (selectedReason == 'Lý do khác') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: otherReasonController,
+                    decoration: InputDecoration(
+                      labelText: 'Nhập lý do cụ thể',
+                      hintText: 'Mô tả chi tiết lý do hủy...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Yêu cầu hủy sẽ được gửi đến Admin để xem xét và phê duyệt.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(outerContext),
+              child: const Text('Đóng'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedReason == null) {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng chọn lý do hủy!'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (selectedReason == 'Lý do khác' && otherReasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Vui lòng nhập lý do cụ thể!'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                final finalReason = selectedReason == 'Lý do khác'
+                    ? otherReasonController.text.trim()
+                    : selectedReason!;
+
+                // Close dialog first
+                Navigator.pop(outerContext);
+
+                // Show loading overlay
+                showDialog(
+                  context: outerContext,
+                  barrierDismissible: false,
+                  builder: (loadingContext) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+
+                try {
+                  final tripType = widget.trip['tripType'] ?? 'regular';
+                  final tripId = widget.trip['id'];
+                  
+                  if (tripType == 'consolidated') {
+                    // Consolidated order cancellation
+                    await EmptyTripService.requestCancelTrip(
+                      tripId: tripId,
+                      reason: finalReason,
+                    );
+                    // Update trip status to failed
+                    await EmptyTripService.updateTripStatus(tripId, 'failed');
+                  } else {
+                    // Regular order cancellation
+                    await OrderStatusService.requestCancelOrder(
+                      orderId: tripId,
+                      reason: finalReason,
+                    );
+                    // Update order status to failed
+                    await OrderStatusService.updateOrderStatus(tripId, 'failed');
+                  }
+
+                  if (!mounted) return;
+                  
+                  // Pop loading
+                  Navigator.pop(outerContext);
+                  // Go back to history
+                  Navigator.pop(outerContext);
+
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Yêu cầu hủy đơn đã được gửi! Chờ Admin phê duyệt.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  
+                  // Pop loading
+                  Navigator.pop(outerContext);
+                  
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Lỗi: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Gửi yêu cầu hủy'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -319,68 +612,19 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
             ),
             const SizedBox(height: 24),
 
-            // BẢN ĐỒ - Using VietMap (Vietnam)
+            // BẢN ĐỒ - Hiển thị route thực từ OSRM
             Container(
-              height: 300,
+              height: 350,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey[300]!),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, spreadRadius: 2),
+                ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: const LatLng(13.9833, 108.0000),
-                    initialZoom: 8.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      // Using OpenStreetMap (works reliably)
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.green_route_app',
-                      
-                      // VietMap - To enable later when API key is fully activated
-                      // Contact VietMap support for correct URL format
-                      // Your API Key: 3a141d0814ed5d76db2b40f8b01fbef208d785344fcdc545
-                      // Possible formats to try:
-                      // - https://maps.vietmap.vn/api/tm/{z}/{x}/{y}.png?apikey=YOUR_KEY
-                      // - Contact: support@vietmap.vn or check https://docs.vietmap.vn/
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: const LatLng(13.9833, 108.0000),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.location_on, color: Colors.green, size: 40),
-                        ),
-                        Marker(
-                          point: const LatLng(12.6667, 108.0500),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(Icons.flag, color: Colors.red, size: 40),
-                        ),
-                      ],
-                    ),
-                    // Real road routing using OSRM API
-                    // Shows actual roads, not straight line
-                    if (routePoints.isNotEmpty)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: routePoints,
-                            color: AppColors.primary,
-                            strokeWidth: 4,
-                          ),
-                        ],
-                      ),
-                    // Loading indicator while fetching route
-                    if (isLoadingRoute)
-                      const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                  ],
-                ),
+                child: _buildMapWidget(),
               ),
             ),
             const SizedBox(height: 24),
@@ -524,6 +768,26 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                   children: [
                     const Text('Hành động', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 16),
+
+                    // CANCEL ORDER BUTTON - Available for all steps except completed
+                    if (currentStep < 3) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _showCancelDialog,
+                          icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                          label: const Text('Yêu cầu hủy đơn hàng', style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                    ],
 
                     if (currentStep == 1) ...[
                       _actionItem('Xác nhận thông tin hàng hóa', 'Loại hàng và khối lượng đúng như mô tả', true),

@@ -1,6 +1,7 @@
 // lib/core/services/order_pool_service.dart
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:latlong2/latlong.dart';
 
 enum OrderType { normal, matching }
 enum OrderStatus { pending, accepted, rejected, delivering, completed }
@@ -22,6 +23,8 @@ class PooledOrder {
   final String deliverDate; // Alias for deliverTime
   final String shipperName;
   final String? shipperPhone;
+  final LatLng? fromLatLng;
+  final LatLng? toLatLng;
   final DateTime postedAt;
 
   OrderStatus status;
@@ -41,6 +44,8 @@ class PooledOrder {
     required this.deliverTime,
     required this.shipperName,
     this.shipperPhone,
+    this.fromLatLng,
+    this.toLatLng,
     this.status = OrderStatus.pending,
     this.hasSeenResult = false,
   }) : price = proposedPrice,
@@ -69,6 +74,8 @@ class OrderPoolService extends ChangeNotifier {
     required String deliver,
     required String shipperName,
     String? shipperPhone,
+    LatLng? fromLatLng,
+    LatLng? toLatLng,
   }) {
     // FIX BUG TRÙNG: chỉ thêm nếu chưa tồn tại (dựa vào from-to-goods)
     final exists = _orders.any((o) =>
@@ -91,6 +98,8 @@ class OrderPoolService extends ChangeNotifier {
       deliverTime: deliver,
       shipperName: shipperName,
       shipperPhone: shipperPhone,
+      fromLatLng: fromLatLng,
+      toLatLng: toLatLng,
     );
 
     _orders.add(order);

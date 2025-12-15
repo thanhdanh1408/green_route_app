@@ -122,6 +122,20 @@ class UserManagementService {
           idNumber ??= fakeUser['idNumber'] as String?;
           hasRoute ??= fakeUser['hasRoute'] as bool?;
         }
+        
+        // 🔍 If empty after fallback, mark as pending verification
+        if (vehicleType == null || vehicleType.isEmpty) {
+          vehicleType = '[Chờ duyệt]';
+          debugPrint('⏳ Driver $userId: vehicleType pending verification');
+        }
+        if (licensePlate == null || licensePlate.isEmpty) {
+          licensePlate = '[Chờ duyệt]';
+          debugPrint('⏳ Driver $userId: licensePlate pending verification');
+        }
+        if (idNumber == null || idNumber.isEmpty) {
+          idNumber = '[Chờ duyệt]';
+          debugPrint('⏳ Driver $userId: idNumber pending verification');
+        }
       } else if (userType == 'shipper') {
         // Load from user-specific keys ONLY
         address = prefs.getString('address_$userId');
@@ -132,6 +146,16 @@ class UserManagementService {
           final fakeUser = authService.fakeUsers[userId]!;
           address ??= fakeUser['address'] as String?;
           company ??= fakeUser['company'] as String?;
+        }
+        
+        // 🔍 If empty after fallback, mark as pending verification
+        if (address == null || address.isEmpty) {
+          address = '[Chờ duyệt]';
+          debugPrint('⏳ Shipper $userId: address pending verification');
+        }
+        if (company == null || company.isEmpty) {
+          company = '[Chờ duyệt]';
+          debugPrint('⏳ Shipper $userId: company pending verification');
         }
       }
 

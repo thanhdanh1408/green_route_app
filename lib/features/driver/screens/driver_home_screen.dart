@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:green_route_app/features/driver/screens/history_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../common/widgets/chatbot_fab.dart';
 import 'driver_route_selection_screen.dart';
 import 'driver_orders_screen.dart';
 import 'driver_empty_trips_screen.dart';
@@ -113,19 +114,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ],
       ),
 
-      floatingActionButton: _currentIndex == 1 // Chỉ hiện ở tab Ghép hàng
-          ? FloatingActionButton(
-              backgroundColor: AppColors.primary,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CreateEmptyTripScreen()),
-                );
-              },
-              tooltip: 'Tạo chuyến ghép hàng',
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
+      floatingActionButton: Stack(
+        children: [
+          // Chatbot button (luôn ở góc phải dưới)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: ChatbotFAB(),
+          ),
+        ],
+      ),
 
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 

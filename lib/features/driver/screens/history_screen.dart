@@ -90,7 +90,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         'status': order.bidStatus == 'transporting' ? 'Đang vận chuyển' : 'Hoàn thành',
         'statusColor': order.bidStatus == 'transporting' ? Colors.orange : Colors.green,
         'price': order.price,
-        'progress': order.bidStatus == 'transporting' ? 2 : 4,
+        'progress': order.bidStatus == 'transporting' ? 2 : 3,
         'from': order.from,
         'to': order.to,
         'fromDetail': order.fromDetail,
@@ -180,6 +180,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 'weight': bid['weight'],
                 'shipperName': bid['shipperName'] ?? 'Không có thông tin',
                 'shipperPhone': bid['shipperPhone'] ?? '',
+                'shipperId': bid['shipperId'] ?? bid['shipperPhone'] ?? '', // Use shipperPhone as ID if shipperId not available
               };
             }
             return null;

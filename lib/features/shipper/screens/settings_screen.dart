@@ -70,12 +70,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         loadedAddress = fakeUser['address'] as String?;
       }
     }
+    
+    if ((loadedCompany == null || loadedCompany.isEmpty) && userId.isNotEmpty) {
+      final fakeUser = AuthService.instance.fakeUsers[userId];
+      if (fakeUser != null && fakeUser['company'] != null) {
+        loadedCompany = fakeUser['company'] as String?;
+      }
+    }
 
     setState(() {
       userName = loadedUserName ?? 'Người dùng';
       userPhone = userId;
-      address = loadedAddress ?? '';
-      company = loadedCompany ?? '';
+      address = loadedAddress ?? '[Chờ duyệt]';
+      company = loadedCompany ?? '[Chờ duyệt]';
       notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
     });
 
