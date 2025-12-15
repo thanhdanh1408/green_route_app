@@ -209,8 +209,13 @@ class _TripTrackingScreenState extends State<TripTrackingScreen> {
                       ) ?? 0;
                       
                       if (amount > 0) {
-                        await WalletService.addTripEarnings(driverId, amount, tripId);
-                        debugPrint('💰 Added ${WalletService.formatCurrency(amount)} to wallet');
+                        // Tính phí sàn 8% cho Green Route
+                        final platformFee = (amount * 0.08).toDouble();
+                        final driverEarnings = amount - platformFee;
+                        
+                        // Cộng tiền cho driver (sau khi trừ phí)
+                        await WalletService.addTripEarnings(driverId, driverEarnings, tripId);
+                        debugPrint('💰 Added ${WalletService.formatCurrency(driverEarnings)} to wallet (after 8% fee)');
                       }
                     }
                     

@@ -86,26 +86,44 @@ class _BidBottomSheetState extends State<BidBottomSheet> {
 
             const Text('Chọn giá đấu thầu của bạn', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8.0, // Khoảng cách ngang
-              runSpacing: 8.0, // Khoảng cách dọc
-              alignment: WrapAlignment.spaceBetween,
+            Row(
               children: prices.entries.map((e) {
                 final isSelected = selectedPrice == e.value;
-                return GestureDetector(
-                  onTap: () => setState(() => selectedPrice = e.value),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isSelected ? AppColors.primary : Colors.grey[300]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(e.key, style: TextStyle(color: isSelected ? AppColors.primary : Colors.black)),
-                        Text(e.value, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                      ],
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => selectedPrice = e.value),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? AppColors.primary : Colors.grey[300]!),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            e.key,
+                            style: TextStyle(
+                              color: isSelected ? AppColors.primary : Colors.black,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            e.value,
+                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

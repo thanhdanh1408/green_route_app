@@ -141,6 +141,11 @@ class WalletService {
     final transactions = await getTransactions(userId, limit: 1000);
     final now = DateTime.now();
     
+    // Tính ngày đầu tiên của tuần (Thứ 2)
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartDate = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    final nowDate = DateTime(now.year, now.month, now.day);
+    
     double today = 0;
     double thisWeek = 0;
     double thisMonth = 0;
@@ -150,17 +155,15 @@ class WalletService {
       
       final txDate = DateTime.parse(tx['date']);
       final amount = (tx['amount'] as num).toDouble();
+      final txDateOnly = DateTime(txDate.year, txDate.month, txDate.day);
 
       // Today
-      if (txDate.year == now.year && 
-          txDate.month == now.month && 
-          txDate.day == now.day) {
+      if (txDateOnly == nowDate) {
         today += amount;
       }
 
-      // This week
-      final weekStart = now.subtract(Duration(days: now.weekday - 1));
-      if (txDate.isAfter(weekStart)) {
+      // This week (from Monday to today, and within same month)
+      if (!txDateOnly.isBefore(weekStartDate) && !nowDate.isBefore(txDateOnly)) {
         thisWeek += amount;
       }
 
