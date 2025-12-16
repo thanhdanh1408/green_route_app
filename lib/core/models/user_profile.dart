@@ -17,6 +17,11 @@ class UserProfile {
   final String? address;
   final String? company;
   
+  // Bank information
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankAccountHolder;
+  
   // Stats
   final double walletBalance;
   final int totalOrders;
@@ -35,6 +40,9 @@ class UserProfile {
     this.hasRoute,
     this.address,
     this.company,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankAccountHolder,
     this.walletBalance = 0.0,
     this.totalOrders = 0,
     this.averageRating,
@@ -55,6 +63,9 @@ class UserProfile {
       'hasRoute': hasRoute,
       'address': address,
       'company': company,
+      'bankName': bankName,
+      'bankAccountNumber': bankAccountNumber,
+      'bankAccountHolder': bankAccountHolder,
       'walletBalance': walletBalance,
       'totalOrders': totalOrders,
       'averageRating': averageRating,
@@ -78,6 +89,9 @@ class UserProfile {
       hasRoute: json['hasRoute'] as bool?,
       address: json['address'] as String?,
       company: json['company'] as String?,
+      bankName: json['bankName'] as String?,
+      bankAccountNumber: json['bankAccountNumber'] as String?,
+      bankAccountHolder: json['bankAccountHolder'] as String?,
       walletBalance: (json['walletBalance'] as num?)?.toDouble() ?? 0.0,
       totalOrders: json['totalOrders'] as int? ?? 0,
       averageRating: (json['averageRating'] as num?)?.toDouble(),
@@ -98,6 +112,9 @@ class UserProfile {
     bool? hasRoute,
     String? address,
     String? company,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountHolder,
     double? walletBalance,
     int? totalOrders,
     double? averageRating,
@@ -115,6 +132,9 @@ class UserProfile {
       hasRoute: hasRoute ?? this.hasRoute,
       address: address ?? this.address,
       company: company ?? this.company,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankAccountHolder: bankAccountHolder ?? this.bankAccountHolder,
       walletBalance: walletBalance ?? this.walletBalance,
       totalOrders: totalOrders ?? this.totalOrders,
       averageRating: averageRating ?? this.averageRating,

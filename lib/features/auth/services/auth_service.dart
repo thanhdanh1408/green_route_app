@@ -12,9 +12,6 @@ class AuthService {
       'role': 'admin',
       'hasRole': true,
       'name': 'Quản trị viên',
-      'bank': 'MBBank',
-      'accountNumber': '888888888888',
-      'accountName': 'QUAN TRI VIEN',
     },
     '0987654321': {
       'password': '12345678',
@@ -26,9 +23,9 @@ class AuthService {
       'vehicleType': '',
       'licensePlate': '',
       'idNumber': '',
-      'bank': 'Techcombank',
-      'accountNumber': '190378291234',
-      'accountName': 'NGUYEN VAN NAM',
+      'bank': '',
+      'accountNumber': '',
+      'accountName': '',
       'idStatus': 'pending',
       'licenseStatus': 'pending',
     },
@@ -42,9 +39,9 @@ class AuthService {
       'vehicleType': '',
       'licensePlate': '',
       'idNumber': '',
-      'bank': 'Techcombank',
-      'accountNumber': '190378291234',
-      'accountName': 'PHAM VAN TUAN',
+      'bank': '',
+      'accountNumber': '',
+      'accountName': '',
       'idStatus': 'pending',
       'licenseStatus': 'pending',
     },
@@ -55,9 +52,9 @@ class AuthService {
       'name': 'Trần Thị Lan',
       'address': '',
       'company': '',
-      'bank': 'Vietcombank',
-      'accountNumber': '0011001934567',
-      'accountName': 'TRAN THI LAN',
+      'bank': '',
+      'accountNumber': '',
+      'accountName': '',
       'idStatus': 'approved',
     },
     '0981521407': {
@@ -67,9 +64,9 @@ class AuthService {
       'name': 'Phan Thành Danh',
       'address': '',
       'company': '',
-      'bank': 'Vietcombank',
-      'accountNumber': '0011001934567',
-      'accountName': 'PHAN THANH DANH',
+      'bank': '',
+      'accountNumber': '',
+      'accountName': '',
       'idStatus': 'approved',
     },
     '0901234567': {
@@ -278,6 +275,9 @@ class AuthService {
       final driverRouteTimeRangeUser = prefs.getString('driver_route_time_range_$currentUserId');
       final addressUser = prefs.getString('address_$currentUserId');
       final companyUser = prefs.getString('company_$currentUserId');
+      final bankNameUser = prefs.getString('bank_name_$currentUserId');
+      final accountNumberUser = prefs.getString('account_number_$currentUserId');
+      final accountHolderUser = prefs.getString('account_holder_$currentUserId');
       
       if (userName != null) userSpecificStringKeys['user_name_$currentUserId'] = userName;
       if (userRole != null) userSpecificStringKeys['user_role_$currentUserId'] = userRole;
@@ -290,6 +290,9 @@ class AuthService {
       if (driverRouteTimeRangeUser != null) userSpecificStringKeys['driver_route_time_range_$currentUserId'] = driverRouteTimeRangeUser;
       if (addressUser != null) userSpecificStringKeys['address_$currentUserId'] = addressUser;
       if (companyUser != null) userSpecificStringKeys['company_$currentUserId'] = companyUser;
+      if (bankNameUser != null) userSpecificStringKeys['bank_name_$currentUserId'] = bankNameUser;
+      if (accountNumberUser != null) userSpecificStringKeys['account_number_$currentUserId'] = accountNumberUser;
+      if (accountHolderUser != null) userSpecificStringKeys['account_holder_$currentUserId'] = accountHolderUser;
       
       // 🔒 CRITICAL: Save BOOL keys (driver_has_route is a BOOL!)
       final driverHasRoute = prefs.getBool('driver_has_route_$currentUserId');
@@ -323,6 +326,9 @@ class AuthService {
     await prefs.remove('address');
     await prefs.remove('company');
     await prefs.remove('license_plate');
+    await prefs.remove('bank_name');
+    await prefs.remove('account_number');
+    await prefs.remove('account_holder');
     
     // 🔒 RESTORE verification documents after clear
     if (verificationDocuments != null) {

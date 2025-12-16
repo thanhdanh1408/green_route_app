@@ -94,6 +94,8 @@ class UserManagementService {
 
       // Check verification status
       final isVerified = await _verificationService.isUserVerified(userId, userType);
+      
+      debugPrint('🔍 getUserById VERIFICATION: $userId, userType=$userType, isVerified=$isVerified');
 
       // Get wallet balance
       final balance = await WalletService.getBalance(userId);

@@ -20,7 +20,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController vehicleTypeController;
   late TextEditingController licensePlateController;
   late TextEditingController idNumberController;
+  late TextEditingController bankNameController;
+  late TextEditingController accountNumberController;
+  late TextEditingController accountHolderController;
   String _userId = '';
+  
+  // Popular Vietnamese banks
+  static const List<String> vietnameseBanks = [
+    'Vietcombank',
+    'Techcombank',
+    'Agribank',
+    'BIDV',
+    'Sacombank',
+    'VP Bank',
+    'ACB',
+    'Đông Á Bank',
+    'TPBank',
+    'MB Bank',
+    'LienVietPostBank',
+    'Kienlongbank',
+    'SHB',
+    'OceanBank',
+    'SeABank',
+    'PG Bank',
+    'NCB',
+    'Eximbank',
+    'VietinBank',
+    'VIB',
+  ];
 
   @override
   void initState() {
@@ -30,6 +57,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     vehicleTypeController = TextEditingController();
     licensePlateController = TextEditingController();
     idNumberController = TextEditingController();
+    bankNameController = TextEditingController();
+    accountNumberController = TextEditingController();
+    accountHolderController = TextEditingController();
     _loadData();
   }
 
@@ -51,6 +81,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     var vehicleType = _userId.isNotEmpty ? (prefs.getString('vehicle_type_$_userId') ?? '') : '';
     var licensePlate = _userId.isNotEmpty ? (prefs.getString('license_plate_$_userId') ?? '') : '';
     var idNumber = _userId.isNotEmpty ? (prefs.getString('id_number_$_userId') ?? '') : '';
+    var bankName = _userId.isNotEmpty ? (prefs.getString('bank_name_$_userId') ?? '') : '';
+    var accountNumber = _userId.isNotEmpty ? (prefs.getString('account_number_$_userId') ?? '') : '';
+    var accountHolder = _userId.isNotEmpty ? (prefs.getString('account_holder_$_userId') ?? '') : '';
     
     setState(() {
       nameController.text = userName ?? '';
@@ -58,6 +91,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       vehicleTypeController.text = vehicleType;
       licensePlateController.text = licensePlate;
       idNumberController.text = idNumber;
+      bankNameController.text = bankName;
+      accountNumberController.text = accountNumber;
+      accountHolderController.text = accountHolder;
     });
   }
 
@@ -71,6 +107,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await prefs.setString('vehicle_type', vehicleTypeController.text.trim());
       await prefs.setString('license_plate', licensePlateController.text.trim().toUpperCase());
       await prefs.setString('id_number', idNumberController.text.trim());
+      await prefs.setString('bank_name', bankNameController.text.trim());
+      await prefs.setString('account_number', accountNumberController.text.trim());
+      await prefs.setString('account_holder', accountHolderController.text.trim());
       
       // 🔒 Lưu vào user-specific keys để admin có thể query
       if (userId.isNotEmpty) {
@@ -78,6 +117,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await prefs.setString('vehicle_type_$userId', vehicleTypeController.text.trim());
         await prefs.setString('license_plate_$userId', licensePlateController.text.trim().toUpperCase());
         await prefs.setString('id_number_$userId', idNumberController.text.trim());
+        await prefs.setString('bank_name_$userId', bankNameController.text.trim());
+        await prefs.setString('account_number_$userId', accountNumberController.text.trim());
+        await prefs.setString('account_holder_$userId', accountHolderController.text.trim());
         debugPrint('✅ Saved profile to user-specific keys for admin query');
       }
 
@@ -100,6 +142,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     vehicleTypeController.dispose();
     licensePlateController.dispose();
     idNumberController.dispose();
+    bankNameController.dispose();
+    accountNumberController.dispose();
+    accountHolderController.dispose();
     super.dispose();
   }
 
@@ -200,6 +245,93 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 }
                 if (value.length < 9 || value.length > 12) {
                   return 'CMND/CCCD phải có 9-12 số';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Bank Information Section
+            const Divider(thickness: 2),
+            const SizedBox(height: 16),
+            const Text(
+              'Thông tin ngân hàng',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thông tin này sẽ được sử dụng để xử lý rút tiền',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Bank Name - Dropdown
+            DropdownButtonFormField<String>(
+              value: bankNameController.text.isNotEmpty ? bankNameController.text : null,
+              decoration: const InputDecoration(
+                labelText: 'Tên ngân hàng *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.account_balance),
+              ),
+              items: vietnameseBanks.map((String bank) {
+                return DropdownMenuItem<String>(
+                  value: bank,
+                  child: Text(bank),
+                );
+              }).toList(),
+              onChanged: (String? value) {
+                setState(() {
+                  if (value != null) {
+                    bankNameController.text = value;
+                  }
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Vui lòng chọn ngân hàng';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Account Number
+            TextFormField(
+              controller: accountNumberController,
+              decoration: const InputDecoration(
+                labelText: 'Số tài khoản *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.numbers),
+                hintText: 'VD: 1234567890123',
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Vui lòng nhập số tài khoản';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Account Holder
+            TextFormField(
+              controller: accountHolderController,
+              decoration: const InputDecoration(
+                labelText: 'Chủ tài khoản *',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person_outline),
+                hintText: 'VD: Nguyễn Văn A',
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Vui lòng nhập tên chủ tài khoản';
                 }
                 return null;
               },

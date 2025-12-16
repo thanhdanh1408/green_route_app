@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/verification_service.dart';
+
 import '../../auth/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'pending_verifications_screen.dart';
 import 'approved_documents_screen.dart';
 import 'rejected_documents_screen.dart';
 import 'cancel_requests_screen.dart';
+import 'transaction_requests_screen.dart' show TransactionRequestsScreen;
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -256,6 +258,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const CancelRequestsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+
+              _AdminCard(
+                icon: Icons.account_balance_wallet,
+                title: 'Nạp/Rút tiền',
+                subtitle: 'Quản lý yêu cầu nạp và rút tiền',
+                color: Colors.blue,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TransactionRequestsScreen(),
                     ),
                   );
                 },

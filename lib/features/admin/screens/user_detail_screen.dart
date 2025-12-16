@@ -1,5 +1,6 @@
 // lib/features/admin/screens/user_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/user_management_service.dart';
 import '../../../core/services/verification_service.dart';
@@ -106,6 +107,21 @@ class _UserDetailScreenState extends State<UserDetailScreen> with SingleTickerPr
     if (result == true) {
       _loadUserData();
     }
+  }
+
+  Future<String?> _getBankName(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('bank_name_$userId');
+  }
+
+  Future<String?> _getAccountNumber(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('account_number_$userId');
+  }
+
+  Future<String?> _getAccountHolder(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('account_holder_$userId');
   }
 
   @override
@@ -278,6 +294,39 @@ class _UserDetailScreenState extends State<UserDetailScreen> with SingleTickerPr
           _InfoRow(label: 'Tổng đơn hàng', value: '${_user!.totalOrders}'),
           if (_user!.averageRating != null)
             _InfoRow(label: 'Đánh giá TB', value: '${_user!.averageRating!.toStringAsFixed(1)} ⭐'),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text(
+            'Thông tin ngân hàng',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<String?>(
+            future: _getBankName(widget.userId),
+            builder: (context, snapshot) {
+              final bankName = snapshot.data ?? 'N/A';
+              return _InfoRow(label: 'Ngân hàng', value: bankName);
+            },
+          ),
+          FutureBuilder<String?>(
+            future: _getAccountNumber(widget.userId),
+            builder: (context, snapshot) {
+              final accountNumber = snapshot.data ?? 'N/A';
+              return _InfoRow(label: 'STK', value: accountNumber);
+            },
+          ),
+          FutureBuilder<String?>(
+            future: _getAccountHolder(widget.userId),
+            builder: (context, snapshot) {
+              final accountHolder = snapshot.data ?? 'N/A';
+              return _InfoRow(label: 'Chủ tài khoản', value: accountHolder);
+            },
+          ),
         ],
       ),
     );

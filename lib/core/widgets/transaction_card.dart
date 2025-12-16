@@ -83,11 +83,13 @@ class TransactionCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final diff = now.difference(date);
+    final nowDate = DateTime(now.year, now.month, now.day);
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final diff = nowDate.difference(dateOnly).inDays;
 
-    if (diff.inDays == 0) {
+    if (diff == 0) {
       return 'Hôm nay ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } else if (diff.inDays == 1) {
+    } else if (diff == 1) {
       return 'Hôm qua ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
     } else {
       return '${date.day}/${date.month}/${date.year}';

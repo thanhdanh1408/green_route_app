@@ -208,8 +208,30 @@ class VerificationService {
 
   // Check if user is fully verified
   Future<bool> isUserVerified(String userId, String userType) async {
+    print('🔐 isUserVerified START: userId=$userId, userType=$userType');
+    
+    // Admin luôn được xác minh (không cần duyệt tài liệu)
+    if (userType == 'admin') {
+      print('🔐 isUserVerified RESULT: Admin → true');
+      return true;
+    }
+
+    // User chưa chọn vai trò → chưa xác minh
+    if (userType.isEmpty || userType == 'unknown') {
+      print('🔐 isUserVerified RESULT: No role (unknown) → false');
+      return false;
+    }
+
     final requiredDocs = DocumentTypes.getRequiredDocuments(userType);
+    
+    // Nếu không có tài liệu yêu cầu → chưa xác minh
+    if (requiredDocs.isEmpty) {
+      print('🔐 isUserVerified RESULT: No required docs for $userType → false');
+      return false;
+    }
+
     final userDocs = await getUserDocuments(userId);
+    print('🔐 isUserVerified: userType=$userType, required=${requiredDocs.length}, userDocs=${userDocs.length}');
 
     for (final requiredType in requiredDocs) {
       final doc = userDocs.firstWhere(
@@ -227,10 +249,12 @@ class VerificationService {
       );
 
       if (doc.id.isEmpty) {
+        print('🔐 isUserVerified RESULT: Missing required doc $requiredType → false');
         return false;
       }
     }
 
+    print('🔐 isUserVerified RESULT: All docs approved → true');
     return true;
   }
 
