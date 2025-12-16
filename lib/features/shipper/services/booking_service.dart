@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import '../../../core/services/notification_service.dart';
 
 class BookingService {
   static const _bookingRequestsKey = 'booking_requests';
@@ -114,11 +115,14 @@ class BookingService {
     final prefs = await SharedPreferences.getInstance();
     final bookingsJson = prefs.getStringList(_bookingRequestsKey) ?? [];
     
+    String? shipperName;
+    
     final updatedBookings = bookingsJson.map((jsonStr) {
       final booking = jsonDecode(jsonStr) as Map<String, dynamic>;
       if (booking['id'] == bookingId && booking['driverId'] == driverId) {
         booking['status'] = 'accepted';
         booking['acceptedAt'] = DateTime.now().toIso8601String();
+        shipperName = booking['shipperName'];
         debugPrint('✅ Accepted booking: $bookingId');
         
         // Lưu vào driver_bids để hiển thị trong history
@@ -128,6 +132,15 @@ class BookingService {
     }).toList();
     
     await prefs.setStringList(_bookingRequestsKey, updatedBookings);
+    
+    // Send notification to driver: booking accepted
+    if (shipperName != null) {
+      await NotificationService.showBidAcceptedNotification(
+        driverId: driverId,
+        bookingId: bookingId,
+        shipperName: shipperName!,
+      );
+    }
   }
   
   // Từ chối booking
@@ -135,17 +148,29 @@ class BookingService {
     final prefs = await SharedPreferences.getInstance();
     final bookingsJson = prefs.getStringList(_bookingRequestsKey) ?? [];
     
+    String? shipperName;
+    
     final updatedBookings = bookingsJson.map((jsonStr) {
       final booking = jsonDecode(jsonStr) as Map<String, dynamic>;
       if (booking['id'] == bookingId && booking['driverId'] == driverId) {
         booking['status'] = 'rejected';
         booking['rejectedAt'] = DateTime.now().toIso8601String();
+        shipperName = booking['shipperName'];
         debugPrint('❌ Rejected booking: $bookingId');
       }
       return jsonEncode(booking);
     }).toList();
     
     await prefs.setStringList(_bookingRequestsKey, updatedBookings);
+    
+    // Send notification to driver: booking rejected
+    if (shipperName != null) {
+      await NotificationService.showBidRejectedNotification(
+        driverId: driverId,
+        bookingId: bookingId,
+        shipperName: shipperName!,
+      );
+    }
   }
   
   // Lưu vào driver_bids để tái sử dụng logic history

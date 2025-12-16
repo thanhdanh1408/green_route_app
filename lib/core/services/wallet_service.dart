@@ -32,6 +32,7 @@ class WalletService {
     required double amount,
     required String description,
     String? relatedId, // Trip ID, Order ID, etc.
+    String? category, // 'earnings', 'deposit', 'withdrawal', 'refund'
   }) async {
     try {
       final currentBalance = await getBalance(userId);
@@ -54,6 +55,7 @@ class WalletService {
         'amount': amount,
         'description': description,
         'relatedId': relatedId,
+        'category': category ?? 'earnings', // Default to earnings
         'balance': newBalance, // Balance after transaction
         'date': DateTime.now().toIso8601String(),
       };
@@ -151,7 +153,23 @@ class WalletService {
     double thisMonth = 0;
 
     for (var tx in transactions) {
+      // Only count 'credit' type
       if (tx['type'] != typeCredit) continue;
+      
+      // Determine category: use stored category, or detect from description
+      String category = tx['category'] ?? 'earnings';
+      if (category == 'earnings') {
+        // For backward compatibility: detect deposit/withdrawal from description
+        final description = (tx['description'] ?? '').toString().toLowerCase();
+        if (description.contains('nạp tiền')) {
+          category = 'deposit';
+        } else if (description.contains('rút tiền')) {
+          category = 'withdrawal';
+        }
+      }
+      
+      // Skip non-earnings transactions
+      if (category != 'earnings') continue;
       
       final txDate = DateTime.parse(tx['date']);
       final amount = (tx['amount'] as num).toDouble();

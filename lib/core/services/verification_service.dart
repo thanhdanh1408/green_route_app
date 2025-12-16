@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/verification_document.dart';
+import 'notification_service.dart';
 
 class VerificationService {
   static const String _documentsKey = 'verification_documents';
@@ -146,22 +147,47 @@ class VerificationService {
 
   // Approve a document (admin action)
   Future<bool> approveDocument(String documentId, String adminId) async {
-    return await _updateDocumentStatus(
+    final result = await _updateDocumentStatus(
       documentId,
       VerificationStatus.approved,
       adminId,
       null,
     );
+    
+    // Send notification to user if approved
+    if (result) {
+      final documents = await getAllDocuments();
+      final doc = documents.firstWhere((d) => d.id == documentId);
+      await NotificationService.showVerificationApprovedNotification(
+        userId: doc.userId,
+        documentType: doc.documentType,
+      );
+    }
+    
+    return result;
   }
 
   // Reject a document (admin action)
   Future<bool> rejectDocument(String documentId, String adminId, String reason) async {
-    return await _updateDocumentStatus(
+    final result = await _updateDocumentStatus(
       documentId,
       VerificationStatus.rejected,
       adminId,
       reason,
     );
+    
+    // Send notification to user if rejected
+    if (result) {
+      final documents = await getAllDocuments();
+      final doc = documents.firstWhere((d) => d.id == documentId);
+      await NotificationService.showVerificationRejectedNotification(
+        userId: doc.userId,
+        documentType: doc.documentType,
+        reason: reason,
+      );
+    }
+    
+    return result;
   }
 
   // Update document status

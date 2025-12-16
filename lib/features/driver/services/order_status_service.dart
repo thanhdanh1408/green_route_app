@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/order_pool_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../models/order_model.dart';
 
 class OrderStatusService {
@@ -58,6 +59,14 @@ class OrderStatusService {
     if (!isDuplicate) {
       shipperBids.add(jsonEncode(bid));
       await prefs.setStringList(_shipperReceivedBidsKey, shipperBids);
+      
+      // Send notification to shipper: new bid received
+      await NotificationService.showBidReceivedNotification(
+        shipperId: order.shipperPhone ?? '',
+        bookingId: order.id,
+        driverName: driverName,
+        bidAmount: bidPrice,
+      );
     }
 
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
@@ -77,6 +86,9 @@ class OrderStatusService {
     final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
     debugPrint('  - Total shipper bids before: ${shipperBids.length}');
 
+    String? shipperName;
+    String? driverName;
+
     final updatedShipperBids = shipperBids.map((s) {
       final bid = jsonDecode(s);
       if (bid['orderId'] == orderId && bid['driverId'] == driverId) {
@@ -85,6 +97,8 @@ class OrderStatusService {
         debugPrint(
             '     shipperId: ${bid['shipperId']}, shipperPhone: ${bid['shipperPhone']}');
         bid['status'] = 'accepted';
+        shipperName = bid['shipperName'];
+        driverName = bid['driverName'];
       }
       return jsonEncode(bid);
     }).toList();
@@ -103,6 +117,15 @@ class OrderStatusService {
       return jsonEncode(bid);
     }).toList();
     await prefs.setStringList(_driverBidsKey, updatedDriverBids);
+
+    // Send notification to driver: bid accepted
+    if (driverName != null && shipperName != null) {
+      await NotificationService.showBidAcceptedNotification(
+        driverId: driverId,
+        bookingId: orderId,
+        shipperName: shipperName!,
+      );
+    }
 
     _orderStreamController.add(null);
   }
@@ -426,12 +449,18 @@ class OrderStatusService {
   static Future<void> updateOrderStatus(String orderId, String newStatus) async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Update in driver_bids
+    // Get order details for notification
     final driverBids = prefs.getStringList(_driverBidsKey) ?? [];
+    String? driverId;
+    String? driverName;
+    
+    // Update in driver_bids
     final updatedDriverBids = driverBids.map((bidJson) {
       final bid = jsonDecode(bidJson) as Map<String, dynamic>;
       if (bid['orderId'] == orderId) {
         bid['status'] = newStatus;
+        driverId = bid['driverId'];
+        driverName = bid['driverName'];
         debugPrint('📝 Updated order $orderId status to $newStatus in driver_bids');
       }
       return jsonEncode(bid);
@@ -440,6 +469,7 @@ class OrderStatusService {
 
     // Update in shipper_received_bids
     final shipperBids = prefs.getStringList(_shipperReceivedBidsKey) ?? [];
+    
     final updatedShipperBids = shipperBids.map((bidJson) {
       final bid = jsonDecode(bidJson) as Map<String, dynamic>;
       if (bid['orderId'] == orderId) {
@@ -449,6 +479,37 @@ class OrderStatusService {
       return jsonEncode(bid);
     }).toList();
     await prefs.setStringList(_shipperReceivedBidsKey, updatedShipperBids);
+
+    // Send notification about order status change
+    if (driverId != null && driverName != null) {
+      String details = '';
+      switch (newStatus) {
+        case 'assigned':
+          details = 'Đơn hàng đã được giao cho bạn';
+          break;
+        case 'in_transit':
+          details = 'Bạn đang trên đường đón khách';
+          break;
+        case 'arrived':
+          details = 'Bạn đã tới nơi đón khách';
+          break;
+        case 'completed':
+          details = 'Đơn hàng hoàn tất thành công';
+          break;
+        case 'cancelled':
+          details = 'Đơn hàng đã bị hủy';
+          break;
+        default:
+          details = 'Trạng thái: $newStatus';
+      }
+      
+      await NotificationService.showOrderStatusNotification(
+        userId: driverId!,
+        orderId: orderId,
+        newStatus: newStatus,
+        details: details,
+      );
+    }
 
     _orderStreamController.add(null);
   }

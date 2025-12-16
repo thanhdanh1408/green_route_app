@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/services/notification_service.dart';
 import '../models/empty_trip_model.dart';
 
 class EmptyTripService {
@@ -158,6 +159,15 @@ class EmptyTripService {
 
     debugPrint(
         '✅ Created pending join request from $shipperName for trip $tripId');
+
+    // Send notification to driver: shipper wants to join empty trip
+    await NotificationService.showTripJoinRequestNotification(
+      driverId: trip.driverId,
+      shipperId: shipperId,
+      shipperName: shipperName,
+      tripId: tripId,
+      tripDetails: '${trip.from} → ${trip.to}',
+    );
 
     _tripStreamController.add(null);
     return true;
@@ -379,6 +389,14 @@ class EmptyTripService {
     await prefs.setStringList('shipper_waiting_orders', shipperOrders);
 
     debugPrint('✅ Approved join request from ${request.shipperName}');
+    
+    // Send notification to shipper: join request approved
+    await NotificationService.showTripApprovedNotification(
+      shipperId: shipperId,
+      tripId: tripId,
+      driverName: trip.driverName,
+    );
+    
     _tripStreamController.add(null);
     return true;
   }
@@ -408,6 +426,13 @@ class EmptyTripService {
     await prefs.setStringList(_emptyTripsKey, allTripsJson);
 
     debugPrint('❌ Rejected join request');
+    
+    // Send notification to shipper: join request rejected
+    await NotificationService.showTripRejectedNotification(
+      shipperId: shipperId,
+      tripId: tripId,
+    );
+    
     _tripStreamController.add(null);
     return true;
   }

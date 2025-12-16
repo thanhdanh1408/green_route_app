@@ -45,6 +45,7 @@ dependencies:
   image: ^3.3.0
   flutter_dotenv: ^5.2.0
   string_similarity: ^2.0.0
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:

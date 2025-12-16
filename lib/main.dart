@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:green_route_app/features/admin/screens/admin_main_screen.dart';
 import 'package:green_route_app/features/shipper/screens/shipper_home_screen.dart';
+import 'package:green_route_app/core/services/notification_service.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen_1.dart';
 import 'features/auth/screens/register_screen_2.dart';
@@ -22,7 +23,9 @@ import 'features/driver/screens/driver_route_selection_screen.dart';
 import 'features/driver/screens/driver_orders_screen.dart';
 import 'features/driver/screens/driver_home_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
   runApp(const ProviderScope(child: GreenRouteApp()));
 }
 
